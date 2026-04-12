@@ -1,0 +1,647 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChevronRight,
+  Check,
+  X,
+  Settings,
+  Search,
+  AlertTriangle,
+  PlayCircle
+} from 'lucide-react'
+import { supabase } from '../lib/supabase.js'
+
+const SORTABLE = [
+  { key: 'queue_number', label: 'Q#' },
+  { key: 'full_name', label: 'Name' },
+  { key: 'state_code', label: 'State code' },
+  { key: 'batch_number', label: 'Batch' },
+  { key: 'registered_at', label: 'Registered' },
+  { key: 'status', label: 'Status' }
+]
+
+export default function Dashboard() {
+  const [rows, setRows] = useState([])
+  const [settings, setSettings] = useState(null)
+  const [sortKey, setSortKey] = useState('queue_number')
+  const [sortDir, setSortDir] = useState('asc')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showStartModal, setShowStartModal] = useState(false)
+  const [pendingBatchSize, setPendingBatchSize] = useState(30)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetConfirmText, setResetConfirmText] = useState('')
+  const [showEmptyBatchConfirm, setShowEmptyBatchConfirm] = useState(false)
+  const [showVoidConfirm, setShowVoidConfirm] = useState(null)
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState('')
+  const [error, setError] = useState('')
+  const settingsRef = useRef(null)
+
+  // Close settings menu on outside click.
+  useEffect(() => {
+    function handleClick(e) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setShowSettingsMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  // ── Data load + realtime ──────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      const [regResp, setResp] = await Promise.all([
+        supabase.from('registrations').select('*').order('queue_number', { ascending: true }),
+        supabase.from('session_settings').select('*').eq('id', 1).single()
+      ])
+      if (cancelled) return
+      if (regResp.error) { showError(regResp.error); return }
+      if (setResp.error) { showError(setResp.error); return }
+      if (regResp.data) setRows(regResp.data)
+      if (setResp.data) {
+        setSettings(setResp.data)
+        setPendingBatchSize(setResp.data.batch_size)
+      }
+    }
+    load()
+
+    const channel = supabase
+      .channel('dashboard')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'registrations' },
+        (payload) => {
+          setRows((prev) => {
+            if (payload.eventType === 'INSERT') {
+              if (prev.some((r) => r.id === payload.new.id)) return prev
+              return [...prev, payload.new]
+            }
+            if (payload.eventType === 'UPDATE') {
+              return prev.map((r) => (r.id === payload.new.id ? payload.new : r))
+            }
+            if (payload.eventType === 'DELETE') {
+              return prev.filter((r) => r.id !== payload.old.id)
+            }
+            return prev
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'session_settings', filter: 'id=eq.1' },
+        (payload) => setSettings(payload.new)
+      )
+      .subscribe()
+
+    return () => { cancelled = true; supabase.removeChannel(channel) }
+  }, [])
+
+  // ── Helpers ───────────────────────────────────────────
+  function flash(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  function showError(e) {
+    const raw = (e && e.message) || String(e || 'Unknown error')
+    let friendly = raw
+    if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
+      friendly = 'Database not set up yet. Open the Supabase SQL editor and run supabase/migrations/0001_init.sql, then reload this page.'
+    } else if (raw.includes('relation') && raw.includes('does not exist')) {
+      friendly = 'Database tables are missing. Run supabase/migrations/0001_init.sql in the Supabase SQL editor, then reload this page.'
+    } else if (raw.toLowerCase().includes('failed to fetch') || raw.toLowerCase().includes('networkerror')) {
+      friendly = 'Cannot reach Supabase. Check the internet connection and that VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are correct.'
+    } else if (raw.includes('JWT') || raw.includes('Invalid API key') || raw.includes('Unauthorized')) {
+      friendly = 'Supabase rejected the API key. Double-check VITE_SUPABASE_ANON_KEY in Vercel/.env.local.'
+    }
+    setError(friendly)
+    console.error('[dashboard]', e)
+  }
+
+  // ── Derived data ──────────────────────────────────────
+  const counts = useMemo(() => {
+    let registered = 0, waiting = 0, served = 0
+    for (const r of rows) {
+      if (r.voided) continue
+      registered += 1
+      if (r.served_at) served += 1
+      else waiting += 1
+    }
+    return { registered, waiting, served }
+  }, [rows])
+
+  const nextBatchNumber = (settings?.current_batch ?? 0) + 1
+  const nextBatchCount = useMemo(() => {
+    return rows.filter(
+      (r) => !r.voided && !r.served_at && r.batch_number === nextBatchNumber
+    ).length
+  }, [rows, nextBatchNumber])
+
+  const sessionActive = settings && settings.current_batch >= 0 && counts.registered > 0
+
+  const filteredAndSortedRows = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim()
+    let list = rows
+    if (q) {
+      list = rows.filter(
+        (r) =>
+          r.full_name.toLowerCase().includes(q) ||
+          r.state_code.toLowerCase().includes(q)
+      )
+    }
+
+    const dir = sortDir === 'asc' ? 1 : -1
+    const key = sortKey
+    const get = (r) => {
+      if (key === 'status') {
+        if (r.voided) return 3
+        if (r.served_at) return 2
+        return 1
+      }
+      return r[key]
+    }
+    return [...list].sort((a, b) => {
+      const va = get(a)
+      const vb = get(b)
+      if (va == null) return 1
+      if (vb == null) return -1
+      if (va < vb) return -1 * dir
+      if (va > vb) return 1 * dir
+      return 0
+    })
+  }, [rows, searchQuery, sortKey, sortDir])
+
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  // ── Actions ───────────────────────────────────────────
+  async function startSession() {
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('reset_day', { p_batch_size: pendingBatchSize })
+      if (e) throw e
+      flash('New session started.')
+      setShowStartModal(false)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function callNextBatch() {
+    if (!settings) return
+    setBusy(true); setError('')
+    try {
+      const next = settings.current_batch + 1
+      const { error: e } = await supabase
+        .from('session_settings')
+        .update({ current_batch: next })
+        .eq('id', 1)
+      if (e) throw e
+      flash(`Now calling batch ${next}.`)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  function handleCallNextBatch() {
+    if (nextBatchCount === 0) {
+      setShowEmptyBatchConfirm(true)
+    } else {
+      callNextBatch()
+    }
+  }
+
+  async function toggleRegistration() {
+    if (!settings) return
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase
+        .from('session_settings')
+        .update({ registration_open: !settings.registration_open })
+        .eq('id', 1)
+      if (e) throw e
+      flash(settings.registration_open ? 'Registration closed.' : 'Registration reopened.')
+      setShowSettingsMenu(false)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function markServed(row) {
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase
+        .from('registrations')
+        .update({ served_at: new Date().toISOString() })
+        .eq('id', row.id)
+      if (e) throw e
+      flash(`Marked ${row.full_name} as served.`)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function voidEntry(row) {
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase
+        .from('registrations')
+        .update({ voided: true })
+        .eq('id', row.id)
+      if (e) throw e
+      flash(`Voided ${row.full_name}.`)
+      setShowVoidConfirm(null)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function resetDay() {
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('reset_day', { p_batch_size: settings?.batch_size ?? 30 })
+      if (e) throw e
+      setShowResetConfirm(false)
+      setResetConfirmText('')
+      flash('Day reset and archived.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  function formatTime(ts) {
+    return new Date(ts).toLocaleTimeString('en-NG', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+  // ── Render ────────────────────────────────────────────
+  return (
+    <div className="max-w-5xl mx-auto p-3 sm:p-5 flex flex-col" style={{ height: 'calc(100vh - 40px)' }}>
+      {/* Error banner */}
+      {error && (
+        <div className="mb-3 bg-red-100 border-2 border-red-500 text-red-950 rounded-xl p-3 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <div className="font-extrabold text-sm">Something went wrong</div>
+            <div className="text-sm mt-0.5 whitespace-pre-wrap">{error}</div>
+          </div>
+          <button onClick={() => setError('')} className="text-red-900 font-bold text-lg leading-none px-1" aria-label="Dismiss">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Top bar: title + settings overflow ── */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <h1 className="text-xl font-extrabold text-slate-950">Dashboard</h1>
+          <p className="text-xs text-slate-600 font-medium">Eti-Osa 3 Special CDS</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Start session — only show when no session or no registrations */}
+          {!sessionActive && (
+            <button
+              onClick={() => setShowStartModal(true)}
+              className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors"
+            >
+              <PlayCircle className="w-4 h-4" />
+              Start session
+            </button>
+          )}
+
+          {/* Settings overflow menu */}
+          <div className="relative" ref={settingsRef}>
+            <button
+              onClick={() => setShowSettingsMenu((p) => !p)}
+              className="p-2 rounded-lg hover:bg-slate-200 active:bg-slate-300 text-slate-700 transition-colors"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            {showSettingsMenu && (
+              <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-40">
+                <button
+                  onClick={toggleRegistration}
+                  disabled={busy || !settings}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-white transition-colors"
+                >
+                  {settings?.registration_open ? 'Close registration' : 'Open registration'}
+                </button>
+                <button
+                  onClick={() => { setShowStartModal(true); setShowSettingsMenu(false) }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
+                >
+                  Start new session
+                </button>
+                <hr className="my-1 border-slate-200" />
+                <button
+                  onClick={() => { setShowResetConfirm(true); setShowSettingsMenu(false) }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors"
+                >
+                  Reset day
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Config strip ── */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-700 mb-3 px-1">
+        <span>Batch size: <span className="text-slate-950">{settings?.batch_size ?? '—'}</span></span>
+        <span className="text-slate-300">|</span>
+        <span>
+          Registration:{' '}
+          {settings?.registration_open ? (
+            <span className="text-emerald-700">Open</span>
+          ) : (
+            <span className="text-red-700">Closed</span>
+          )}
+        </span>
+      </div>
+
+      {/* ── Hero: Call next batch ── */}
+      <div className="mb-4">
+        <button
+          onClick={handleCallNextBatch}
+          disabled={busy || !settings}
+          title={nextBatchCount === 0 ? 'No corps members in the next batch yet' : `Call batch ${nextBatchNumber} (${nextBatchCount} corps members)`}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-lg shadow-emerald-900/20 transition-colors"
+        >
+          <ChevronRight className="w-6 h-6" />
+          Call next batch
+          {settings?.current_batch > 0 && (
+            <span className="ml-1 bg-white/20 rounded-md px-2 py-0.5 text-sm font-bold">
+              → {nextBatchNumber}
+            </span>
+          )}
+        </button>
+        {nextBatchCount === 0 && settings?.current_batch >= 0 && (
+          <p className="text-xs text-slate-500 mt-1.5 pl-1">No corps members in batch {nextBatchNumber} yet.</p>
+        )}
+      </div>
+
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <Stat label="Now serving" value={settings?.current_batch ? `Batch ${settings.current_batch}` : 'None'} accent />
+        <Stat label="Registered" value={counts.registered} />
+        <Stat label="Waiting" value={counts.waiting} />
+        <Stat label="Served" value={counts.served} />
+      </div>
+
+      {/* ── Search bar ── */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by name or state code…"
+          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none bg-white text-slate-950 placeholder-slate-500"
+        />
+      </div>
+
+      {/* ── Table ── */}
+      <div className="flex-1 min-h-0 bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col">
+        <div className="overflow-auto flex-1">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-200 text-slate-950 sticky top-0 z-10">
+              <tr>
+                {SORTABLE.map((c) => (
+                  <th
+                    key={c.key}
+                    onClick={() => toggleSort(c.key)}
+                    className="px-3 py-2.5 text-left font-extrabold cursor-pointer select-none whitespace-nowrap text-xs uppercase tracking-wide"
+                  >
+                    {c.label}{' '}
+                    {sortKey === c.key && (
+                      <span className="text-emerald-700">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                    )}
+                  </th>
+                ))}
+                <th className="px-3 py-2.5 text-left font-extrabold text-xs uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500 font-medium">
+                    {searchQuery ? 'No matches found.' : 'No registrations yet.'}
+                  </td>
+                </tr>
+              )}
+              {filteredAndSortedRows.map((r, i) => (
+                <tr
+                  key={r.id}
+                  className={`border-t border-slate-100 transition-colors ${
+                    r.voided ? 'opacity-40' : ''
+                  } ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'} ${
+                    !r.voided && !r.served_at ? 'hover:bg-emerald-50' : ''
+                  }`}
+                >
+                  <td className="px-3 py-2 font-extrabold text-slate-950">{r.queue_number}</td>
+                  <td className="px-3 py-2 font-semibold text-slate-950">{r.full_name}</td>
+                  <td className="px-3 py-2 font-mono text-slate-800">{r.state_code}</td>
+                  <td className="px-3 py-2 text-slate-950">{r.batch_number}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-slate-800">
+                    {formatTime(r.registered_at)}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.voided ? (
+                      <span className="font-bold text-red-800">Voided</span>
+                    ) : r.served_at ? (
+                      <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
+                        <Check className="w-3.5 h-3.5" /> Served
+                      </span>
+                    ) : (
+                      <span className="font-bold text-slate-700">Waiting</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => markServed(r)}
+                        disabled={busy || !!r.served_at || r.voided}
+                        className="text-xs bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-2.5 py-1.5 rounded transition-colors"
+                      >
+                        Mark served
+                      </button>
+                      <button
+                        onClick={() => setShowVoidConfirm(r)}
+                        disabled={busy || r.voided}
+                        title={r.voided ? 'Already voided' : `Void ${r.full_name}`}
+                        className="p-1.5 rounded text-slate-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredAndSortedRows.length > 0 && (
+          <div className="px-3 py-1.5 border-t border-slate-200 text-xs text-slate-600 bg-slate-50 font-medium flex-shrink-0">
+            {searchQuery
+              ? `${filteredAndSortedRows.length} of ${rows.length} entries`
+              : `${rows.length} entries total`}
+          </div>
+        )}
+      </div>
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-950 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold z-50">
+          {toast}
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      {showStartModal && (
+        <Modal onClose={() => setShowStartModal(false)}>
+          <h2 className="text-lg font-extrabold text-slate-950">Start a new session</h2>
+          <p className="text-slate-700 text-sm mt-1">
+            This archives all current entries and starts fresh.
+          </p>
+          <label className="block mt-4">
+            <span className="text-sm font-bold text-slate-900">Batch size (20–50)</span>
+            <input
+              type="number"
+              min={20}
+              max={50}
+              value={pendingBatchSize}
+              onChange={(e) => setPendingBatchSize(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-2.5 text-lg text-slate-950"
+            />
+          </label>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => setShowStartModal(false)}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={startSession}
+              disabled={busy || pendingBatchSize < 20 || pendingBatchSize > 50}
+              className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              Start session
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showResetConfirm && (
+        <Modal onClose={() => { setShowResetConfirm(false); setResetConfirmText('') }}>
+          <h2 className="text-lg font-extrabold text-slate-950">Reset day?</h2>
+          <p className="text-slate-800 text-sm mt-2">
+            This will archive all of today's {counts.registered} entries. The queue restarts at 1. This cannot be undone.
+          </p>
+          <label className="block mt-4">
+            <span className="text-sm font-bold text-slate-900">Type <span className="font-mono bg-slate-200 px-1.5 py-0.5 rounded">RESET</span> to confirm</span>
+            <input
+              type="text"
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value.toUpperCase())}
+              autoComplete="off"
+              className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-red-600 focus:outline-none px-3 py-2.5 text-lg font-mono tracking-wider text-slate-950"
+              placeholder="RESET"
+            />
+          </label>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => { setShowResetConfirm(false); setResetConfirmText('') }}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={resetDay}
+              disabled={busy || resetConfirmText !== 'RESET'}
+              className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 active:bg-red-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold transition-colors"
+            >
+              Yes, reset everything
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showEmptyBatchConfirm && (
+        <Modal onClose={() => setShowEmptyBatchConfirm(false)}>
+          <h2 className="text-lg font-extrabold text-slate-950">Empty batch</h2>
+          <p className="text-slate-800 text-sm mt-2">
+            Batch {nextBatchNumber} has no registrants. Skip to Batch {nextBatchNumber} anyway?
+          </p>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => setShowEmptyBatchConfirm(false)}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setShowEmptyBatchConfirm(false); callNextBatch() }}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:bg-slate-300 text-white font-bold transition-colors"
+            >
+              Skip anyway
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showVoidConfirm && (
+        <Modal onClose={() => setShowVoidConfirm(null)}>
+          <h2 className="text-lg font-extrabold text-slate-950">Void entry?</h2>
+          <p className="text-slate-800 text-sm mt-2">
+            Void entry for <strong>{showVoidConfirm.full_name}</strong> (state code <strong className="font-mono">{showVoidConfirm.state_code}</strong>)?
+            This cannot be undone. Their state code will be freed for re-registration.
+          </p>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => setShowVoidConfirm(null)}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => voidEntry(showVoidConfirm)}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 active:bg-red-900 disabled:bg-slate-300 text-white font-bold transition-colors"
+            >
+              Void entry
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ── Stat card ─────────────────────────────────────────────
+function Stat({ label, value, accent }) {
+  return (
+    <div className={`rounded-xl p-3 border-2 ${
+      accent
+        ? 'bg-amber-100 border-amber-400 text-amber-950'
+        : 'bg-slate-50 border-slate-200 text-slate-950'
+    }`}>
+      <div className={`text-[11px] uppercase font-extrabold tracking-wide ${
+        accent ? 'text-amber-800' : 'text-slate-600'
+      }`}>{label}</div>
+      <div className="text-2xl font-extrabold leading-tight mt-0.5">{value}</div>
+    </div>
+  )
+}
+
+// ── Modal shell ───────────────────────────────────────────
+function Modal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}

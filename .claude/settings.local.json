@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npm create:*)",
+      "Bash(VITE_SUPABASE_URL=https://placeholder.supabase.co VITE_SUPABASE_ANON_KEY=eyJplaceholder npm run build)",
+      "Bash(VITE_SUPABASE_URL=https://ctsvoengfhdogdsasldc.supabase.co VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0c3ZvZW5nZmhkb2dkc2FzbGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5Mjk1MzksImV4cCI6MjA5MTUwNTUzOX0.5HRCUyd4-VrXrOyJLMnczmFdVbs5dw5oKhOqR1LEAKc npm run build)"
+    ]
+  }
+}
