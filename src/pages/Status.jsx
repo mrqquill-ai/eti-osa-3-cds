@@ -147,15 +147,29 @@ export default function Status() {
         <div className="text-base mt-1">Head to clearance immediately.</div>
       </div>
     )
+  } else if (currentBatch > 0 && batchesAhead > 0) {
+    statusBlock = (
+      <div className="bg-slate-100 border-2 border-slate-300 text-slate-800 rounded-2xl p-6 text-center">
+        <div className="text-6xl">&#x23F3;</div>
+        <div className="text-2xl font-extrabold mt-2">Waiting</div>
+        <div className="text-base mt-1">
+          You are in <span className="font-extrabold">Batch {reg.batch_number}</span>
+        </div>
+        <div className="text-sm mt-1 text-slate-600">
+          Batch {currentBatch} is being served now &mdash; {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} batches before yours`}
+        </div>
+      </div>
+    )
   } else {
     statusBlock = (
       <div className="bg-slate-100 border-2 border-slate-300 text-slate-800 rounded-2xl p-6 text-center">
         <div className="text-6xl">&#x23F3;</div>
         <div className="text-2xl font-extrabold mt-2">Waiting</div>
         <div className="text-base mt-1">
-          {batchesAhead === 1
-            ? '1 batch ahead of you'
-            : `${batchesAhead} batches ahead of you`}
+          You are in <span className="font-extrabold">Batch {reg.batch_number}</span>
+        </div>
+        <div className="text-sm mt-1 text-slate-600">
+          Clearance has not started yet
         </div>
       </div>
     )
