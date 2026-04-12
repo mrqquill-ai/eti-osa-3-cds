@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [showVoidConfirm, setShowVoidConfirm] = useState(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [rowBusy, setRowBusy] = useState(null) // id of the row currently being updated
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const settingsRef = useRef(null)
@@ -243,7 +244,7 @@ export default function Dashboard() {
   }
 
   async function toggleServed(row) {
-    setBusy(true); setError('')
+    setRowBusy(row.id); setError('')
     const alreadyServed = !!row.served_at
     try {
       const { error: e } = await supabase
@@ -252,11 +253,11 @@ export default function Dashboard() {
         .eq('id', row.id)
       if (e) throw e
       flash(alreadyServed ? `Unmarked ${row.full_name} as served.` : `Marked ${row.full_name} as served.`)
-    } catch (e) { showError(e) } finally { setBusy(false) }
+    } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
 
   async function toggleVoid(row) {
-    setBusy(true); setError('')
+    setRowBusy(row.id); setError('')
     const alreadyVoided = !!row.voided
     try {
       const { error: e } = await supabase
@@ -266,7 +267,7 @@ export default function Dashboard() {
       if (e) throw e
       flash(alreadyVoided ? `Restored ${row.full_name}.` : `Voided ${row.full_name}.`)
       setShowVoidConfirm(null)
-    } catch (e) { showError(e) } finally { setBusy(false) }
+    } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
 
   async function resetDay() {
@@ -488,18 +489,18 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => toggleServed(r)}
-                        disabled={busy || r.voided}
+                        disabled={rowBusy === r.id || r.voided}
                         className={`text-xs font-bold px-2.5 py-1.5 rounded transition-colors ${
                           r.served_at
                             ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white'
                             : 'bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white'
                         } disabled:bg-slate-300 disabled:cursor-not-allowed`}
                       >
-                        {r.served_at ? 'Undo served' : 'Mark served'}
+                        {rowBusy === r.id ? '...' : r.served_at ? 'Undo served' : 'Mark served'}
                       </button>
                       <button
                         onClick={() => r.voided ? toggleVoid(r) : setShowVoidConfirm(r)}
-                        disabled={busy}
+                        disabled={rowBusy === r.id}
                         title={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
                         className={`p-1.5 rounded transition-colors ${
                           r.voided
