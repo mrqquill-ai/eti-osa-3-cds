@@ -143,7 +143,7 @@ export default function Status() {
     statusBlock = (
       <div className="bg-amber-100 border-2 border-amber-500 text-amber-900 rounded-2xl p-6 text-center animate-pulse">
         <div className="text-6xl">&#x1F514;</div>
-        <div className="text-2xl font-extrabold mt-2">Your batch is now being served</div>
+        <div className="text-2xl font-extrabold mt-2">Your wave is now being served</div>
         <div className="text-base mt-1">Head to clearance immediately.</div>
       </div>
     )
@@ -153,10 +153,10 @@ export default function Status() {
         <div className="text-6xl">&#x23F3;</div>
         <div className="text-2xl font-extrabold mt-2">Waiting</div>
         <div className="text-base mt-1">
-          You are in <span className="font-extrabold">Batch {reg.batch_number}</span>
+          You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
         <div className="text-sm mt-1 text-slate-600">
-          Batch {currentBatch} is being served now &mdash; {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} batches before yours`}
+          Wave {currentBatch} is being served now &mdash; {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
         </div>
       </div>
     )
@@ -166,7 +166,7 @@ export default function Status() {
         <div className="text-6xl">&#x23F3;</div>
         <div className="text-2xl font-extrabold mt-2">Waiting</div>
         <div className="text-base mt-1">
-          You are in <span className="font-extrabold">Batch {reg.batch_number}</span>
+          You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
         <div className="text-sm mt-1 text-slate-600">
           Clearance has not started yet
@@ -197,7 +197,7 @@ export default function Status() {
             </div>
           </div>
           <div className="bg-slate-100 rounded-xl p-4 text-center">
-            <div className="text-xs uppercase text-slate-600 font-bold">Your batch</div>
+            <div className="text-xs uppercase text-slate-600 font-bold">Your wave</div>
             <div className="text-5xl font-extrabold text-slate-900 leading-none mt-1">
               {reg.batch_number}
             </div>
@@ -206,7 +206,7 @@ export default function Status() {
 
         <div className="mt-3 text-center text-sm text-slate-600">
           {currentBatch > 0
-            ? <>Now serving batch <span className="font-extrabold text-slate-900">{currentBatch}</span></>
+            ? <>Now serving wave <span className="font-extrabold text-slate-900">{currentBatch}</span></>
             : <span className="text-slate-500">Clearance has not started yet</span>}
         </div>
 
@@ -218,7 +218,7 @@ export default function Status() {
         <div className="bg-white rounded-2xl shadow border border-slate-200 mt-4 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <div className="font-extrabold text-slate-900 text-sm">Batch {reg.batch_number} Queue</div>
+              <div className="font-extrabold text-slate-900 text-sm">Wave {reg.batch_number} Queue</div>
               <div className="text-xs text-slate-500">{batchServed} of {batchTotal} served</div>
             </div>
             <div className="bg-slate-100 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700">

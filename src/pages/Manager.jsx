@@ -138,7 +138,7 @@ export default function Manager() {
               </div>
             </div>
             <div className="bg-slate-100 rounded-xl p-4 text-center">
-              <div className="text-xs uppercase text-slate-600 font-bold">Batch</div>
+              <div className="text-xs uppercase text-slate-600 font-bold">Wave</div>
               <div className="text-4xl font-extrabold text-slate-900 leading-none mt-1">
                 {result.batch_number}
               </div>

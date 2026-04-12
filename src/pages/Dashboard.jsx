@@ -16,7 +16,7 @@ const SORTABLE = [
   { key: 'queue_number', label: 'Q#' },
   { key: 'full_name', label: 'Name' },
   { key: 'state_code', label: 'State code' },
-  { key: 'batch_number', label: 'Batch' },
+  { key: 'batch_number', label: 'Wave' },
   { key: 'registered_at', label: 'Registered' },
   { key: 'status', label: 'Status' }
 ]
@@ -202,7 +202,7 @@ export default function Dashboard() {
         .update({ current_batch: next })
         .eq('id', 1)
       if (e) throw e
-      flash(`Now calling batch ${next}.`)
+      flash(`Now calling wave ${next}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -224,7 +224,7 @@ export default function Dashboard() {
         .update({ current_batch: prev })
         .eq('id', 1)
       if (e) throw e
-      flash(prev === 0 ? 'Went back — no batch serving now.' : `Went back to batch ${prev}.`)
+      flash(prev === 0 ? 'Went back — no wave serving now.' : `Went back to wave ${prev}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -362,7 +362,7 @@ export default function Dashboard() {
 
       {/* ── Config strip ── */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-700 mb-3 px-1">
-        <span>Batch size: <span className="text-slate-950">{settings?.batch_size ?? '—'}</span></span>
+        <span>Wave size: <span className="text-slate-950">{settings?.batch_size ?? '—'}</span></span>
         <span className="text-slate-300">|</span>
         <span>
           Registration:{' '}
@@ -379,11 +379,11 @@ export default function Dashboard() {
         <button
           onClick={handleCallNextBatch}
           disabled={busy || !settings}
-          title={nextBatchCount === 0 ? 'No corps members in the next batch yet' : `Call batch ${nextBatchNumber} (${nextBatchCount} corps members)`}
+          title={nextBatchCount === 0 ? 'No corps members in the next wave yet' : `Call wave ${nextBatchNumber} (${nextBatchCount} corps members)`}
           className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-lg shadow-emerald-900/20 transition-colors"
         >
           <ChevronRight className="w-6 h-6" />
-          Call next batch
+          Call next wave
           {settings?.current_batch > 0 && (
             <span className="ml-1 bg-white/20 rounded-md px-2 py-0.5 text-sm font-bold">
               → {nextBatchNumber}
@@ -394,7 +394,7 @@ export default function Dashboard() {
           <button
             onClick={goBackBatch}
             disabled={busy}
-            title={`Go back to batch ${(settings?.current_batch ?? 1) - 1}`}
+            title={`Go back to wave ${(settings?.current_batch ?? 1) - 1}`}
             className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-800 font-bold px-4 py-4 rounded-xl text-sm transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -404,13 +404,13 @@ export default function Dashboard() {
       </div>
       <div className="mb-4 -mt-2">
         {nextBatchCount === 0 && settings?.current_batch >= 0 && (
-          <p className="text-xs text-slate-500 pl-1">No corps members in batch {nextBatchNumber} yet.</p>
+          <p className="text-xs text-slate-500 pl-1">No corps members in wave {nextBatchNumber} yet.</p>
         )}
       </div>
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Stat label="Now serving" value={settings?.current_batch ? `Batch ${settings.current_batch}` : 'None'} accent />
+        <Stat label="Now serving" value={settings?.current_batch ? `Wave ${settings.current_batch}` : 'None'} accent />
         <Stat label="Registered" value={counts.registered} />
         <Stat label="Waiting" value={counts.waiting} />
         <Stat label="Served" value={counts.served} />
@@ -540,7 +540,7 @@ export default function Dashboard() {
             This archives all current entries and starts fresh.
           </p>
           <label className="block mt-4">
-            <span className="text-sm font-bold text-slate-900">Batch size (20–50)</span>
+            <span className="text-sm font-bold text-slate-900">Wave size (20–50)</span>
             <input
               type="number"
               min={20}
@@ -605,9 +605,9 @@ export default function Dashboard() {
 
       {showEmptyBatchConfirm && (
         <Modal onClose={() => setShowEmptyBatchConfirm(false)}>
-          <h2 className="text-lg font-extrabold text-slate-950">Empty batch</h2>
+          <h2 className="text-lg font-extrabold text-slate-950">Empty wave</h2>
           <p className="text-slate-800 text-sm mt-2">
-            Batch {nextBatchNumber} has no registrants. Skip to Batch {nextBatchNumber} anyway?
+            Wave {nextBatchNumber} has no registrants. Skip to Wave {nextBatchNumber} anyway?
           </p>
           <div className="mt-5 flex gap-2 justify-end">
             <button
