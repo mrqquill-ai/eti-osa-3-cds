@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Check,
   X,
+  RotateCcw,
   Settings,
   Search,
   AlertTriangle,
@@ -226,27 +227,29 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
-  async function markServed(row) {
+  async function toggleServed(row) {
     setBusy(true); setError('')
+    const alreadyServed = !!row.served_at
     try {
       const { error: e } = await supabase
         .from('registrations')
-        .update({ served_at: new Date().toISOString() })
+        .update({ served_at: alreadyServed ? null : new Date().toISOString() })
         .eq('id', row.id)
       if (e) throw e
-      flash(`Marked ${row.full_name} as served.`)
+      flash(alreadyServed ? `Unmarked ${row.full_name} as served.` : `Marked ${row.full_name} as served.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
-  async function voidEntry(row) {
+  async function toggleVoid(row) {
     setBusy(true); setError('')
+    const alreadyVoided = !!row.voided
     try {
       const { error: e } = await supabase
         .from('registrations')
-        .update({ voided: true })
+        .update({ voided: !alreadyVoided })
         .eq('id', row.id)
       if (e) throw e
-      flash(`Voided ${row.full_name}.`)
+      flash(alreadyVoided ? `Restored ${row.full_name}.` : `Voided ${row.full_name}.`)
       setShowVoidConfirm(null)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
@@ -456,19 +459,27 @@ export default function Dashboard() {
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
                       <button
-                        onClick={() => markServed(r)}
-                        disabled={busy || !!r.served_at || r.voided}
-                        className="text-xs bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-2.5 py-1.5 rounded transition-colors"
+                        onClick={() => toggleServed(r)}
+                        disabled={busy || r.voided}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded transition-colors ${
+                          r.served_at
+                            ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white'
+                            : 'bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white'
+                        } disabled:bg-slate-300 disabled:cursor-not-allowed`}
                       >
-                        Mark served
+                        {r.served_at ? 'Undo served' : 'Mark served'}
                       </button>
                       <button
-                        onClick={() => setShowVoidConfirm(r)}
-                        disabled={busy || r.voided}
-                        title={r.voided ? 'Already voided' : `Void ${r.full_name}`}
-                        className="p-1.5 rounded text-slate-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        onClick={() => r.voided ? toggleVoid(r) : setShowVoidConfirm(r)}
+                        disabled={busy}
+                        title={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
+                        className={`p-1.5 rounded transition-colors ${
+                          r.voided
+                            ? 'text-amber-600 hover:text-amber-800 hover:bg-amber-100 active:bg-amber-200'
+                            : 'text-slate-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200'
+                        } disabled:opacity-30 disabled:cursor-not-allowed`}
                       >
-                        <X className="w-4 h-4" />
+                        {r.voided ? <RotateCcw className="w-4 h-4" /> : <X className="w-4 h-4" />}
                       </button>
                     </div>
                   </td>
@@ -603,7 +614,7 @@ export default function Dashboard() {
               Cancel
             </button>
             <button
-              onClick={() => voidEntry(showVoidConfirm)}
+              onClick={() => toggleVoid(showVoidConfirm)}
               disabled={busy}
               className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 active:bg-red-900 disabled:bg-slate-300 text-white font-bold transition-colors"
             >
