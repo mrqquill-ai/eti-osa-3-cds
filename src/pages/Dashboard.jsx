@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ChevronLeft,
   ChevronRight,
   Check,
   X,
@@ -213,6 +214,20 @@ export default function Dashboard() {
     }
   }
 
+  async function goBackBatch() {
+    if (!settings || settings.current_batch <= 0) return
+    setBusy(true); setError('')
+    try {
+      const prev = settings.current_batch - 1
+      const { error: e } = await supabase
+        .from('session_settings')
+        .update({ current_batch: prev })
+        .eq('id', 1)
+      if (e) throw e
+      flash(prev === 0 ? 'Went back — no batch serving now.' : `Went back to batch ${prev}.`)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
   async function toggleRegistration() {
     if (!settings) return
     setBusy(true); setError('')
@@ -359,13 +374,13 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {/* ── Hero: Call next batch ── */}
-      <div className="mb-4">
+      {/* ── Hero: Call next batch + Go back ── */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={handleCallNextBatch}
           disabled={busy || !settings}
           title={nextBatchCount === 0 ? 'No corps members in the next batch yet' : `Call batch ${nextBatchNumber} (${nextBatchCount} corps members)`}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-lg shadow-emerald-900/20 transition-colors"
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-lg shadow-emerald-900/20 transition-colors"
         >
           <ChevronRight className="w-6 h-6" />
           Call next batch
@@ -375,8 +390,21 @@ export default function Dashboard() {
             </span>
           )}
         </button>
+        {settings?.current_batch > 0 && (
+          <button
+            onClick={goBackBatch}
+            disabled={busy}
+            title={`Go back to batch ${(settings?.current_batch ?? 1) - 1}`}
+            className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-800 font-bold px-4 py-4 rounded-xl text-sm transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Go back
+          </button>
+        )}
+      </div>
+      <div className="mb-4 -mt-2">
         {nextBatchCount === 0 && settings?.current_batch >= 0 && (
-          <p className="text-xs text-slate-500 mt-1.5 pl-1">No corps members in batch {nextBatchNumber} yet.</p>
+          <p className="text-xs text-slate-500 pl-1">No corps members in batch {nextBatchNumber} yet.</p>
         )}
       </div>
 
