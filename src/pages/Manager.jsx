@@ -68,7 +68,7 @@ export default function Manager() {
       const { data, error: rpcError } = await supabase.rpc('register_corps_member', {
         p_state_code: code,
         p_full_name: name,
-        p_device_id: getDeviceId()
+        p_device_id: null
       })
 
       if (rpcError) {
@@ -78,7 +78,7 @@ export default function Manager() {
         } else if (msg.includes('registration_closed')) {
           setError('Registration is closed for the day.')
         } else if (msg.includes('device_limit_reached')) {
-          setError('Too many registrations from this device. Limit is 5 per session.')
+          setError('This device has already been used to register someone. Please use another device or ask another executive.')
         } else if (msg.includes('register_corps_member') || (msg.includes('function') && msg.includes('does not exist'))) {
           setError('Database not set up yet. An executive must run the SQL setup file in Supabase before registrations can be saved.')
         } else if (msg.toLowerCase().includes('failed to fetch')) {
