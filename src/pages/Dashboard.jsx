@@ -25,73 +25,14 @@ const SORTABLE = [
 ]
 
 export default function Dashboard() {
-  // ── PIN gate ──────────────────────────────────────────
+  // ── ALL hooks declared up front (React rules of hooks) ──
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
   const [unlocked, setUnlocked] = useState(() => {
-    // If no PIN is configured, skip the gate entirely
     if (!DASHBOARD_PIN) return true
-    // Check if already unlocked this session
     try { return sessionStorage.getItem('dashboard_unlocked') === 'yes' } catch { return false }
   })
 
-  function handlePinSubmit(e) {
-    e.preventDefault()
-    const trimmed = pinInput.trim()
-    if (!DASHBOARD_PIN) {
-      // No PIN configured — let them through
-      setUnlocked(true)
-      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
-      return
-    }
-    if (trimmed === DASHBOARD_PIN) {
-      setUnlocked(true)
-      setPinError('')
-      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
-    } else {
-      setPinError('Wrong PIN. Try again.')
-      setPinInput('')
-    }
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-xs w-full text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-emerald-100 rounded-full p-3">
-              <Lock className="w-8 h-8 text-emerald-800" />
-            </div>
-          </div>
-          <h1 className="text-xl font-extrabold text-slate-950">Dashboard locked</h1>
-          <p className="text-sm text-slate-600 mt-1">Enter the executive PIN to continue.</p>
-          <form onSubmit={handlePinSubmit} className="mt-5">
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pinInput}
-              onChange={(e) => { setPinInput(e.target.value); setPinError('') }}
-              placeholder="Enter PIN"
-              autoFocus
-              className="w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
-            />
-            {pinError && (
-              <div className="text-red-700 text-sm font-semibold mt-2">{pinError}</div>
-            )}
-            <button
-              type="submit"
-              disabled={!pinInput}
-              className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-base transition-colors"
-            >
-              Unlock
-            </button>
-          </form>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Main dashboard (only renders after PIN is verified) ──
   const [rows, setRows] = useState([])
   const [settings, setSettings] = useState(null)
   const [sortKey, setSortKey] = useState('queue_number')
@@ -105,7 +46,7 @@ export default function Dashboard() {
   const [showVoidConfirm, setShowVoidConfirm] = useState(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [rowBusy, setRowBusy] = useState(null) // id of the row currently being updated
+  const [rowBusy, setRowBusy] = useState(null)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const settingsRef = useRef(null)
@@ -123,6 +64,7 @@ export default function Dashboard() {
 
   // ── Data load + realtime ──────────────────────────────
   useEffect(() => {
+    if (!unlocked) return
     let cancelled = false
 
     async function load() {
@@ -170,7 +112,7 @@ export default function Dashboard() {
       .subscribe()
 
     return () => { cancelled = true; supabase.removeChannel(channel) }
-  }, [])
+  }, [unlocked])
 
   // ── Helpers ───────────────────────────────────────────
   function flash(msg) {
@@ -253,6 +195,24 @@ export default function Dashboard() {
   }
 
   // ── Actions ───────────────────────────────────────────
+  function handlePinSubmit(e) {
+    e.preventDefault()
+    const trimmed = pinInput.trim()
+    if (!DASHBOARD_PIN) {
+      setUnlocked(true)
+      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
+      return
+    }
+    if (trimmed === DASHBOARD_PIN) {
+      setUnlocked(true)
+      setPinError('')
+      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
+    } else {
+      setPinError('Wrong PIN. Try again.')
+      setPinInput('')
+    }
+  }
+
   async function startSession() {
     setBusy(true); setError('')
     try {
@@ -295,7 +255,7 @@ export default function Dashboard() {
         .update({ current_batch: prev })
         .eq('id', 1)
       if (e) throw e
-      flash(prev === 0 ? 'Went back — no wave serving now.' : `Went back to wave ${prev}.`)
+      flash(prev === 0 ? 'Went back - no wave serving now.' : `Went back to wave ${prev}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -359,7 +319,45 @@ export default function Dashboard() {
     })
   }
 
-  // ── Render ────────────────────────────────────────────
+  // ── PIN screen ────────────────────────────────────────
+  if (!unlocked) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-xs w-full text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-emerald-100 rounded-full p-3">
+              <Lock className="w-8 h-8 text-emerald-800" />
+            </div>
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-950">Dashboard locked</h1>
+          <p className="text-sm text-slate-600 mt-1">Enter the executive PIN to continue.</p>
+          <form onSubmit={handlePinSubmit} className="mt-5">
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pinInput}
+              onChange={(e) => { setPinInput(e.target.value); setPinError('') }}
+              placeholder="Enter PIN"
+              autoFocus
+              className="w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
+            />
+            {pinError && (
+              <div className="text-red-700 text-sm font-semibold mt-2">{pinError}</div>
+            )}
+            <button
+              type="submit"
+              disabled={!pinInput}
+              className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-base transition-colors"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main dashboard ────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto p-3 sm:p-5 flex flex-col" style={{ height: 'calc(100vh - 40px)' }}>
       {/* Error banner */}
@@ -383,7 +381,6 @@ export default function Dashboard() {
           <p className="text-xs text-slate-600 font-medium">Eti-Osa 3 Special CDS</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Start session — only show when no session or no registrations */}
           {!sessionActive && (
             <button
               onClick={() => setShowStartModal(true)}
@@ -394,7 +391,6 @@ export default function Dashboard() {
             </button>
           )}
 
-          {/* Settings overflow menu */}
           <div className="relative" ref={settingsRef}>
             <button
               onClick={() => setShowSettingsMenu((p) => !p)}
@@ -433,7 +429,7 @@ export default function Dashboard() {
 
       {/* ── Config strip ── */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-700 mb-3 px-1">
-        <span>Wave size: <span className="text-slate-950">{settings?.batch_size ?? '—'}</span></span>
+        <span>Wave size: <span className="text-slate-950">{settings?.batch_size ?? '-'}</span></span>
         <span className="text-slate-300">|</span>
         <span>
           Registration:{' '}
@@ -445,7 +441,7 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {/* ── Hero: Call next batch + Go back ── */}
+      {/* ── Hero: Call next wave + Go back ── */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={handleCallNextBatch}
@@ -457,7 +453,7 @@ export default function Dashboard() {
           Call next wave
           {settings?.current_batch > 0 && (
             <span className="ml-1 bg-white/20 rounded-md px-2 py-0.5 text-sm font-bold">
-              → {nextBatchNumber}
+              &rarr; {nextBatchNumber}
             </span>
           )}
         </button>
@@ -494,7 +490,7 @@ export default function Dashboard() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name or state code…"
+          placeholder="Search by name or state code..."
           className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none bg-white text-slate-950 placeholder-slate-500"
         />
       </div>
@@ -513,7 +509,7 @@ export default function Dashboard() {
                   >
                     {c.label}{' '}
                     {sortKey === c.key && (
-                      <span className="text-emerald-700">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                      <span className="text-emerald-700">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
                     )}
                   </th>
                 ))}
@@ -611,7 +607,7 @@ export default function Dashboard() {
             This archives all current entries and starts fresh.
           </p>
           <label className="block mt-4">
-            <span className="text-sm font-bold text-slate-900">Wave size (20–50)</span>
+            <span className="text-sm font-bold text-slate-900">Wave size (20-50)</span>
             <input
               type="number"
               min={20}
