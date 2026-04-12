@@ -1,6 +1,9 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 
 export default function App() {
+  const location = useLocation()
+  const isStatusPage = location.pathname.startsWith('/status')
+
   const linkBase = 'px-2.5 py-1 rounded text-sm font-semibold'
   const linkClass = ({ isActive }) =>
     isActive
@@ -12,10 +15,12 @@ export default function App() {
       <header className="bg-emerald-900 text-white">
         <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
           <div className="font-extrabold tracking-tight text-sm sm:text-base">Eti-Osa 3 Special CDS</div>
-          <nav className="flex gap-1">
-            <NavLink to="/manager" className={linkClass}>Check in</NavLink>
-            <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
-          </nav>
+          {!isStatusPage && (
+            <nav className="flex gap-1">
+              <NavLink to="/manager" className={linkClass}>Check in</NavLink>
+              <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
+            </nav>
+          )}
         </div>
       </header>
       <main className="flex-1">
