@@ -95,10 +95,20 @@ begin
     raise exception 'duplicate_state_code' using errcode = 'P0002';
   end if;
 
+  -- Spam protection: max 5 registrations per device per session.
+  if p_device_id is not null and (
+    select count(*) from public.registrations
+    where device_id = p_device_id
+      and registered_at >= v_settings.session_started_at
+  ) >= 5 then
+    raise exception 'device_limit_reached' using errcode = 'P0003';
+  end if;
+
+  -- Count ALL rows (including voided) so voiding never causes a
+  -- duplicate queue_number collision with the unique index.
   select coalesce(max(queue_number), 0) + 1
     into v_next_q
-    from public.registrations
-    where voided = false;
+    from public.registrations;
 
   v_batch := ceil(v_next_q::numeric / v_settings.batch_size)::int;
 

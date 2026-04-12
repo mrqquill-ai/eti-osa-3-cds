@@ -13,8 +13,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
-const DASHBOARD_PIN = import.meta.env.VITE_DASHBOARD_PIN || ''
-
 const SORTABLE = [
   { key: 'queue_number', label: 'Q#' },
   { key: 'full_name', label: 'Name' },
@@ -28,8 +26,10 @@ export default function Dashboard() {
   // ── ALL hooks declared up front (React rules of hooks) ──
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
+  const [adminPin, setAdminPin] = useState(() => {
+    try { return sessionStorage.getItem('admin_pin') || '' } catch { return '' }
+  })
   const [unlocked, setUnlocked] = useState(() => {
-    if (!DASHBOARD_PIN) return true
     try { return sessionStorage.getItem('dashboard_unlocked') === 'yes' } catch { return false }
   })
 
@@ -45,6 +45,8 @@ export default function Dashboard() {
   const [showEmptyBatchConfirm, setShowEmptyBatchConfirm] = useState(false)
   const [showVoidConfirm, setShowVoidConfirm] = useState(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showChangePinModal, setShowChangePinModal] = useState(false)
+  const [newPinInput, setNewPinInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [rowBusy, setRowBusy] = useState(null)
   const [toast, setToast] = useState('')
@@ -123,12 +125,18 @@ export default function Dashboard() {
   function showError(e) {
     const raw = (e && e.message) || String(e || 'Unknown error')
     let friendly = raw
-    if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
-      friendly = 'Database not set up yet. Open the Supabase SQL editor and run supabase/migrations/0001_init.sql, then reload this page.'
+    if (raw.includes('invalid_admin_pin')) {
+      friendly = 'Invalid PIN. Your session may have expired. Please refresh and log in again.'
+      // Force re-lock
+      setUnlocked(false)
+      setAdminPin('')
+      try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin') } catch {}
+    } else if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
+      friendly = 'Database not set up yet. Open the Supabase SQL editor and run the migration files, then reload this page.'
     } else if (raw.includes('relation') && raw.includes('does not exist')) {
-      friendly = 'Database tables are missing. Run supabase/migrations/0001_init.sql in the Supabase SQL editor, then reload this page.'
+      friendly = 'Database tables are missing. Run the migration SQL in the Supabase SQL editor, then reload this page.'
     } else if (raw.toLowerCase().includes('failed to fetch') || raw.toLowerCase().includes('networkerror')) {
-      friendly = 'Cannot reach Supabase. Check the internet connection and that VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are correct.'
+      friendly = 'Cannot reach Supabase. Check the internet connection.'
     } else if (raw.includes('JWT') || raw.includes('Invalid API key') || raw.includes('Unauthorized')) {
       friendly = 'Supabase rejected the API key. Double-check VITE_SUPABASE_ANON_KEY in Vercel/.env.local.'
     }
@@ -194,29 +202,46 @@ export default function Dashboard() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  // ── Actions ───────────────────────────────────────────
-  function handlePinSubmit(e) {
+  // ── Actions (all use server-side PIN validation) ──────
+  async function handlePinSubmit(e) {
     e.preventDefault()
     const trimmed = pinInput.trim()
-    if (!DASHBOARD_PIN) {
-      setUnlocked(true)
-      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
-      return
-    }
-    if (trimmed === DASHBOARD_PIN) {
-      setUnlocked(true)
-      setPinError('')
-      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
-    } else {
-      setPinError('Wrong PIN. Try again.')
-      setPinInput('')
+    if (!trimmed) return
+
+    setBusy(true)
+    setPinError('')
+    try {
+      const { data, error: rpcError } = await supabase.rpc('verify_admin_pin', { p_pin: trimmed })
+      if (rpcError) throw rpcError
+      if (data === true) {
+        setAdminPin(trimmed)
+        setUnlocked(true)
+        try {
+          sessionStorage.setItem('dashboard_unlocked', 'yes')
+          sessionStorage.setItem('admin_pin', trimmed)
+        } catch {}
+      } else {
+        setPinError('Wrong PIN. Try again.')
+        setPinInput('')
+      }
+    } catch (err) {
+      const msg = (err && err.message) || ''
+      if (msg.toLowerCase().includes('failed to fetch')) {
+        setPinError('No internet connection. Try again.')
+      } else if (msg.includes('verify_admin_pin') || msg.includes('does not exist')) {
+        setPinError('Security update needed. Ask the admin to run the latest SQL migration.')
+      } else {
+        setPinError('Could not verify PIN. Try again.')
+      }
+    } finally {
+      setBusy(false)
     }
   }
 
   async function startSession() {
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('reset_day', { p_batch_size: pendingBatchSize })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: pendingBatchSize })
       if (e) throw e
       flash('New session started.')
       setShowStartModal(false)
@@ -227,13 +252,9 @@ export default function Dashboard() {
     if (!settings) return
     setBusy(true); setError('')
     try {
-      const next = settings.current_batch + 1
-      const { error: e } = await supabase
-        .from('session_settings')
-        .update({ current_batch: next })
-        .eq('id', 1)
+      const { data, error: e } = await supabase.rpc('admin_call_next_batch', { p_pin: adminPin })
       if (e) throw e
-      flash(`Now calling wave ${next}.`)
+      flash(`Now calling wave ${data}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -249,13 +270,9 @@ export default function Dashboard() {
     if (!settings || settings.current_batch <= 0) return
     setBusy(true); setError('')
     try {
-      const prev = settings.current_batch - 1
-      const { error: e } = await supabase
-        .from('session_settings')
-        .update({ current_batch: prev })
-        .eq('id', 1)
+      const { data, error: e } = await supabase.rpc('admin_go_back_batch', { p_pin: adminPin })
       if (e) throw e
-      flash(prev === 0 ? 'Went back - no wave serving now.' : `Went back to wave ${prev}.`)
+      flash(data === 0 ? 'Went back - no wave serving now.' : `Went back to wave ${data}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -263,39 +280,28 @@ export default function Dashboard() {
     if (!settings) return
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase
-        .from('session_settings')
-        .update({ registration_open: !settings.registration_open })
-        .eq('id', 1)
+      const { data, error: e } = await supabase.rpc('admin_toggle_registration', { p_pin: adminPin })
       if (e) throw e
-      flash(settings.registration_open ? 'Registration closed.' : 'Registration reopened.')
+      flash(data ? 'Registration reopened.' : 'Registration closed.')
       setShowSettingsMenu(false)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
   async function toggleServed(row) {
     setRowBusy(row.id); setError('')
-    const alreadyServed = !!row.served_at
     try {
-      const { error: e } = await supabase
-        .from('registrations')
-        .update({ served_at: alreadyServed ? null : new Date().toISOString() })
-        .eq('id', row.id)
+      const { error: e } = await supabase.rpc('admin_toggle_served', { p_pin: adminPin, p_registration_id: row.id })
       if (e) throw e
-      flash(alreadyServed ? `Unmarked ${row.full_name} as served.` : `Marked ${row.full_name} as served.`)
+      flash(row.served_at ? `Unmarked ${row.full_name} as served.` : `Marked ${row.full_name} as served.`)
     } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
 
   async function toggleVoid(row) {
     setRowBusy(row.id); setError('')
-    const alreadyVoided = !!row.voided
     try {
-      const { error: e } = await supabase
-        .from('registrations')
-        .update({ voided: !alreadyVoided })
-        .eq('id', row.id)
+      const { error: e } = await supabase.rpc('admin_toggle_void', { p_pin: adminPin, p_registration_id: row.id })
       if (e) throw e
-      flash(alreadyVoided ? `Restored ${row.full_name}.` : `Voided ${row.full_name}.`)
+      flash(row.voided ? `Restored ${row.full_name}.` : `Voided ${row.full_name}.`)
       setShowVoidConfirm(null)
     } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
@@ -303,11 +309,28 @@ export default function Dashboard() {
   async function resetDay() {
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('reset_day', { p_batch_size: settings?.batch_size ?? 30 })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: settings?.batch_size ?? 30 })
       if (e) throw e
       setShowResetConfirm(false)
       setResetConfirmText('')
       flash('Day reset and archived.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function changePin() {
+    if (newPinInput.length < 4) {
+      setError('New PIN must be at least 4 characters.')
+      return
+    }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('admin_change_pin', { p_current_pin: adminPin, p_new_pin: newPinInput })
+      if (e) throw e
+      setAdminPin(newPinInput)
+      try { sessionStorage.setItem('admin_pin', newPinInput) } catch {}
+      setShowChangePinModal(false)
+      setNewPinInput('')
+      flash('PIN changed successfully.')
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -346,10 +369,10 @@ export default function Dashboard() {
             )}
             <button
               type="submit"
-              disabled={!pinInput}
+              disabled={!pinInput || busy}
               className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-base transition-colors"
             >
-              Unlock
+              {busy ? 'Verifying...' : 'Unlock'}
             </button>
           </form>
         </div>
@@ -413,6 +436,12 @@ export default function Dashboard() {
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                   Start new session
+                </button>
+                <button
+                  onClick={() => { setShowChangePinModal(true); setShowSettingsMenu(false) }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
+                >
+                  Change PIN
                 </button>
                 <hr className="my-1 border-slate-200" />
                 <button
@@ -699,7 +728,7 @@ export default function Dashboard() {
           <h2 className="text-lg font-extrabold text-slate-950">Void entry?</h2>
           <p className="text-slate-800 text-sm mt-2">
             Void entry for <strong>{showVoidConfirm.full_name}</strong> (state code <strong className="font-mono">{showVoidConfirm.state_code}</strong>)?
-            This cannot be undone. Their state code will be freed for re-registration.
+            This will remove them from the active queue. You can restore them later.
           </p>
           <div className="mt-5 flex gap-2 justify-end">
             <button
@@ -714,6 +743,38 @@ export default function Dashboard() {
               className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 active:bg-red-900 disabled:bg-slate-300 text-white font-bold transition-colors"
             >
               Void entry
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showChangePinModal && (
+        <Modal onClose={() => { setShowChangePinModal(false); setNewPinInput('') }}>
+          <h2 className="text-lg font-extrabold text-slate-950">Change PIN</h2>
+          <p className="text-slate-700 text-sm mt-1">
+            Enter a new PIN (at least 4 characters).
+          </p>
+          <input
+            type="password"
+            value={newPinInput}
+            onChange={(e) => setNewPinInput(e.target.value)}
+            placeholder="New PIN"
+            autoFocus
+            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
+          />
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => { setShowChangePinModal(false); setNewPinInput('') }}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={changePin}
+              disabled={busy || newPinInput.length < 4}
+              className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              Save new PIN
             </button>
           </div>
         </Modal>

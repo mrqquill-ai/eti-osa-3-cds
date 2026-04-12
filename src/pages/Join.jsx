@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId } from '../lib/supabase.js'
 
@@ -8,7 +8,7 @@ const VENUE_LNG = 3.523451
 const RADIUS_METERS = 200
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000 // Earth radius in meters
+  const R = 6371000
   const toRad = (d) => (d * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
@@ -23,22 +23,27 @@ export default function Join() {
 
   const [geoState, setGeoState] = useState('checking') // checking | allowed | denied | too_far | error
   const [distance, setDistance] = useState(null)
+  const [userCoords, setUserCoords] = useState(null)
   const [fullName, setFullName] = useState('')
   const [stateCode, setStateCode] = useState('')
   const [stateCodeError, setStateCodeError] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [registrationOpen, setRegistrationOpen] = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const retryCount = useRef(0)
 
-  // Check registration status
+  // Poll registration status
   useEffect(() => {
     async function check() {
-      const { data } = await supabase
-        .from('session_settings')
-        .select('registration_open')
-        .eq('id', 1)
-        .single()
-      if (data) setRegistrationOpen(data.registration_open)
+      try {
+        const { data } = await supabase
+          .from('session_settings')
+          .select('registration_open')
+          .eq('id', 1)
+          .single()
+        if (data) setRegistrationOpen(data.registration_open)
+      } catch {}
     }
     check()
     const interval = setInterval(check, 30000)
@@ -56,12 +61,10 @@ export default function Join() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const dist = haversineDistance(
-          pos.coords.latitude,
-          pos.coords.longitude,
-          VENUE_LAT,
-          VENUE_LNG
-        )
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        setUserCoords({ lat, lng })
+        const dist = haversineDistance(lat, lng, VENUE_LAT, VENUE_LNG)
         setDistance(Math.round(dist))
         if (dist <= RADIUS_METERS) {
           setGeoState('allowed')
@@ -76,7 +79,7 @@ export default function Join() {
           setGeoState('error')
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     )
   }, [])
 
@@ -89,7 +92,7 @@ export default function Join() {
     }
   }
 
-  async function handleSubmit(e) {
+  function handleFormSubmit(e) {
     e.preventDefault()
     setError('')
     setStateCodeError('')
@@ -98,40 +101,79 @@ export default function Join() {
     const name = fullName.trim()
 
     if (!name) return setError('Enter your full name.')
+    if (name.length < 2) return setError('Name must be at least 2 characters.')
     if (!STATE_CODE_REGEX.test(code)) {
       setStateCodeError('State code format: XX/00X/0000 - e.g. LA/24A/1234 or LA/25B/11622.')
       return
     }
 
+    // Show confirmation step
+    setShowConfirm(true)
+  }
+
+  async function submitRegistration() {
+    const code = normalizeStateCode(stateCode)
+    const name = fullName.trim()
+
     setBusy(true)
-    try {
-      const { data, error: rpcError } = await supabase.rpc('register_corps_member', {
-        p_state_code: code,
-        p_full_name: name,
-        p_device_id: getDeviceId()
-      })
+    setError('')
+    retryCount.current = 0
 
-      if (rpcError) {
-        const msg = rpcError.message || ''
-        if (msg.includes('duplicate_state_code')) {
-          setError('You have already registered today.')
-        } else if (msg.includes('registration_closed')) {
-          setError('Registration is closed for the day.')
-        } else if (msg.toLowerCase().includes('failed to fetch')) {
-          setError('No internet connection. Check your data or Wi-Fi and try again.')
-        } else {
-          setError(msg || 'Could not register. Try again.')
+    async function attempt() {
+      try {
+        const params = {
+          p_state_code: code,
+          p_full_name: name,
+          p_device_id: getDeviceId()
         }
-        return
-      }
+        // Pass coordinates for server-side geofence validation
+        if (userCoords) {
+          params.p_lat = userCoords.lat
+          params.p_lng = userCoords.lng
+        }
 
-      // Redirect to status page
-      navigate(`/status/${encodeURIComponent(data.state_code)}`)
-    } catch (err) {
-      setError(err.message || 'Network error. Try again.')
-    } finally {
-      setBusy(false)
+        const { data, error: rpcError } = await supabase.rpc('register_corps_member', params)
+
+        if (rpcError) {
+          const msg = rpcError.message || ''
+          if (msg.includes('duplicate_state_code')) {
+            setError('You have already registered today.')
+          } else if (msg.includes('registration_closed')) {
+            setError('Registration is closed for the day.')
+          } else if (msg.includes('device_limit_reached')) {
+            setError('Too many registrations from this device. Please see an executive at the desk.')
+          } else if (msg.includes('outside_geofence')) {
+            setError('You must be at the venue to register. Move closer and try again.')
+          } else if (msg.toLowerCase().includes('failed to fetch')) {
+            // Auto-retry up to 3 times on network errors
+            if (retryCount.current < 3) {
+              retryCount.current += 1
+              setError(`Network error. Retrying... (${retryCount.current}/3)`)
+              setTimeout(attempt, 2000 * retryCount.current)
+              return
+            }
+            setError('No internet connection. Check your data or Wi-Fi and try again.')
+          } else {
+            setError(msg || 'Could not register. Try again.')
+          }
+          setBusy(false)
+          return
+        }
+
+        navigate(`/status/${encodeURIComponent(data.state_code)}`)
+      } catch (err) {
+        if (retryCount.current < 3) {
+          retryCount.current += 1
+          setError(`Connection lost. Retrying... (${retryCount.current}/3)`)
+          setTimeout(attempt, 2000 * retryCount.current)
+          return
+        }
+        setError('Network error. Please try again.')
+        setBusy(false)
+      }
     }
+
+    await attempt()
   }
 
   // --- Render ---
@@ -184,7 +226,7 @@ export default function Join() {
         <p className="text-slate-600 mt-2 text-sm">
           You must be at <span className="font-semibold">Jamatul Islamiyya Primary School, Baale St, Lekki</span> to join the queue.
         </p>
-        {distance && (
+        {distance != null && (
           <p className="text-slate-500 text-xs mt-2">
             You are approximately {distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} away.
           </p>
@@ -217,6 +259,52 @@ export default function Join() {
     )
   }
 
+  // Confirmation step
+  if (showConfirm) {
+    return (
+      <div className="max-w-md mx-auto p-4 sm:p-6">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mt-6">
+          <h2 className="text-xl font-extrabold text-slate-900 text-center">Confirm your details</h2>
+          <p className="text-slate-600 text-sm text-center mt-1">Please check that everything is correct.</p>
+
+          <div className="mt-5 space-y-3">
+            <div className="bg-slate-50 rounded-xl p-4">
+              <div className="text-xs uppercase text-slate-500 font-bold">Full name</div>
+              <div className="text-lg font-semibold text-slate-900 mt-0.5">{fullName.trim()}</div>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-4">
+              <div className="text-xs uppercase text-slate-500 font-bold">State code</div>
+              <div className="text-lg font-semibold text-slate-900 font-mono mt-0.5">{normalizeStateCode(stateCode)}</div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 bg-red-50 border-2 border-red-300 text-red-800 rounded-lg px-3 py-2 text-sm font-semibold">
+              {error}
+            </div>
+          )}
+
+          <div className="mt-5 flex gap-3">
+            <button
+              onClick={() => { setShowConfirm(false); setError('') }}
+              disabled={busy}
+              className="flex-1 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:bg-slate-100 text-slate-900 font-bold py-3 rounded-xl text-base"
+            >
+              Go back
+            </button>
+            <button
+              onClick={submitRegistration}
+              disabled={busy}
+              className="flex-1 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold py-3 rounded-xl text-base"
+            >
+              {busy ? 'Joining...' : 'Confirm & Join'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // geoState === 'allowed' — show registration form
   return (
     <div className="max-w-md mx-auto p-4 sm:p-6">
@@ -229,7 +317,7 @@ export default function Join() {
       <h1 className="text-2xl font-extrabold text-slate-900 mt-4 text-center">Join the Queue</h1>
       <p className="text-slate-600 text-sm text-center">Eti-Osa 3 Special CDS Clearance</p>
 
-      <form onSubmit={handleSubmit} className="mt-5 bg-white rounded-2xl shadow border border-slate-200 p-5 space-y-4">
+      <form onSubmit={handleFormSubmit} className="mt-5 bg-white rounded-2xl shadow border border-slate-200 p-5 space-y-4">
         <label className="block">
           <span className="text-sm font-semibold text-slate-700">Full name</span>
           <input
@@ -274,7 +362,7 @@ export default function Join() {
           disabled={busy}
           className="w-full bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold py-4 rounded-xl text-lg"
         >
-          {busy ? 'Joining queue...' : 'Join Queue'}
+          Join Queue
         </button>
       </form>
 

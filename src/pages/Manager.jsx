@@ -11,12 +11,11 @@ export default function Manager() {
   const [result, setResult] = useState(null) // {state_code, queue_number, batch_number, full_name}
   const [registrationOpen, setRegistrationOpen] = useState(true)
 
-  // Watch the registration_open flag in real time so the screen
-  // immediately blocks new entries when the dashboard closes intake.
+  // Poll registration_open flag every 10 seconds (saves realtime connections).
   useEffect(() => {
     let cancelled = false
 
-    async function loadInitial() {
+    async function check() {
       const { data } = await supabase
         .from('session_settings')
         .select('registration_open')
@@ -24,20 +23,12 @@ export default function Manager() {
         .single()
       if (!cancelled && data) setRegistrationOpen(data.registration_open)
     }
-    loadInitial()
-
-    const channel = supabase
-      .channel('manager-settings')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'session_settings', filter: 'id=eq.1' },
-        (payload) => setRegistrationOpen(payload.new.registration_open)
-      )
-      .subscribe()
+    check()
+    const interval = setInterval(check, 10000)
 
     return () => {
       cancelled = true
-      supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [])
 
@@ -86,6 +77,8 @@ export default function Manager() {
           setError('This state code has already registered today.')
         } else if (msg.includes('registration_closed')) {
           setError('Registration is closed for the day.')
+        } else if (msg.includes('device_limit_reached')) {
+          setError('Too many registrations from this device. Limit is 5 per session.')
         } else if (msg.includes('register_corps_member') || (msg.includes('function') && msg.includes('does not exist'))) {
           setError('Database not set up yet. An executive must run the SQL setup file in Supabase before registrations can be saved.')
         } else if (msg.toLowerCase().includes('failed to fetch')) {

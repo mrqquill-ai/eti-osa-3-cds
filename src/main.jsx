@@ -13,7 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <Routes>
         <Route element={<App />}>
-          <Route index element={<Navigate to="/manager" replace />} />
+          <Route index element={<Navigate to="/join" replace />} />
           <Route path="/manager" element={<Manager />} />
           <Route path="/status/:stateCode" element={<Status />} />
           <Route path="/join" element={<Join />} />

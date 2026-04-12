@@ -229,10 +229,12 @@ export default function Status() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className={`text-sm font-semibold truncate ${isYou ? 'text-emerald-900' : 'text-slate-900'}`}>
-                      {m.full_name}
+                      {isYou ? m.full_name : m.full_name.split(' ')[0]}
                       {isYou && <span className="ml-1.5 text-[10px] bg-emerald-200 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full uppercase">You</span>}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">{m.state_code}</div>
+                    <div className="text-xs text-slate-500 font-mono">
+                      {isYou ? m.state_code : m.state_code.replace(/(\w{2}\/\w+\/)(\d+)/, (_, prefix, digits) => prefix + digits.slice(0, 2) + '***')}
+                    </div>
                   </div>
                   <div className={`text-xs font-bold flex-shrink-0 ${
                     served ? 'text-emerald-700' : 'text-slate-500'
