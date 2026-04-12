@@ -2,7 +2,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom'
 
 export default function App() {
   const location = useLocation()
-  const isStatusPage = location.pathname.startsWith('/status')
+  const isStatusPage = location.pathname.startsWith('/status') || location.pathname.startsWith('/join')
 
   const linkBase = 'px-2.5 py-1 rounded text-sm font-semibold'
   const linkClass = ({ isActive }) =>

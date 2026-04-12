@@ -48,55 +48,43 @@ export default function Status() {
     return () => { cancelled = true }
   }, [code])
 
-  // Realtime subscriptions.
+  // Poll every 30 seconds instead of realtime (saves connection limits).
   useEffect(() => {
-    if (!code) return
-    const channel = supabase
-      .channel(`status-${code}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'registrations' },
-        (payload) => {
-          // Update this corps member's own row
-          if (payload.eventType === 'DELETE' && payload.old?.state_code === code) {
-            setReg(null)
-            setNotFound(true)
-          } else if (payload.new?.state_code === code) {
-            setReg(payload.new)
-            setNotFound(false)
-          }
+    if (!code || notFound) return
 
-          // Update batch members list in real time
-          setBatchMembers((prev) => {
-            if (payload.eventType === 'INSERT' && payload.new && !payload.new.voided) {
-              // Check if this new member is in our batch
-              if (prev.length > 0 && payload.new.batch_number === prev[0].batch_number) {
-                if (prev.some((m) => m.id === payload.new.id)) return prev
-                return [...prev, payload.new].sort((a, b) => a.queue_number - b.queue_number)
-              }
-              return prev
-            }
-            if (payload.eventType === 'UPDATE' && payload.new) {
-              return prev
-                .map((m) => (m.id === payload.new.id ? payload.new : m))
-                .filter((m) => !m.voided)
-            }
-            if (payload.eventType === 'DELETE') {
-              return prev.filter((m) => m.id !== payload.old.id)
-            }
-            return prev
-          })
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'session_settings', filter: 'id=eq.1' },
-        (payload) => setSettings(payload.new)
-      )
-      .subscribe()
+    const poll = async () => {
+      const [{ data: r }, { data: s }] = await Promise.all([
+        supabase
+          .from('registrations')
+          .select('*')
+          .eq('state_code', code)
+          .eq('voided', false)
+          .maybeSingle(),
+        supabase.from('session_settings').select('*').eq('id', 1).single()
+      ])
 
-    return () => { supabase.removeChannel(channel) }
-  }, [code])
+      if (!r) {
+        setReg(null)
+        setNotFound(true)
+        return
+      }
+
+      setReg(r)
+      if (s) setSettings(s)
+
+      // Refresh batch members
+      const { data: members } = await supabase
+        .from('registrations')
+        .select('id, full_name, state_code, queue_number, batch_number, served_at, voided')
+        .eq('batch_number', r.batch_number)
+        .eq('voided', false)
+        .order('queue_number', { ascending: true })
+      if (members) setBatchMembers(members)
+    }
+
+    const interval = setInterval(poll, 30000)
+    return () => clearInterval(interval)
+  }, [code, notFound])
 
   if (loading) {
     return <CenteredCard><p className="text-slate-500">Loading...</p></CenteredCard>
@@ -259,7 +247,7 @@ export default function Status() {
       )}
 
       <p className="text-[11px] text-slate-400 text-center mt-4 mb-6">
-        This page updates automatically. Keep it open.
+        This page refreshes every 30 seconds. Keep it open.
       </p>
     </div>
   )

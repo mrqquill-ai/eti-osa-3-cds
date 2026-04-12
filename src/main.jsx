@@ -5,6 +5,7 @@ import App from './App.jsx'
 import Manager from './pages/Manager.jsx'
 import Status from './pages/Status.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import Join from './pages/Join.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route index element={<Navigate to="/manager" replace />} />
           <Route path="/manager" element={<Manager />} />
           <Route path="/status/:stateCode" element={<Status />} />
+          <Route path="/join" element={<Join />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<Navigate to="/manager" replace />} />
         </Route>
