@@ -8,9 +8,12 @@ import {
   Settings,
   Search,
   AlertTriangle,
-  PlayCircle
+  PlayCircle,
+  Lock
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+
+const DASHBOARD_PIN = import.meta.env.VITE_DASHBOARD_PIN || ''
 
 const SORTABLE = [
   { key: 'queue_number', label: 'Q#' },
@@ -22,6 +25,66 @@ const SORTABLE = [
 ]
 
 export default function Dashboard() {
+  // ── PIN gate ──────────────────────────────────────────
+  const [pinInput, setPinInput] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [unlocked, setUnlocked] = useState(() => {
+    // If no PIN is configured, skip the gate entirely
+    if (!DASHBOARD_PIN) return true
+    // Check if already unlocked this session
+    try { return sessionStorage.getItem('dashboard_unlocked') === 'yes' } catch { return false }
+  })
+
+  function handlePinSubmit(e) {
+    e.preventDefault()
+    if (pinInput === DASHBOARD_PIN) {
+      setUnlocked(true)
+      setPinError('')
+      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
+    } else {
+      setPinError('Wrong PIN. Try again.')
+      setPinInput('')
+    }
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-xs w-full text-center">
+          <div className="flex justify-center mb-4">
+            <div className="bg-emerald-100 rounded-full p-3">
+              <Lock className="w-8 h-8 text-emerald-800" />
+            </div>
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-950">Dashboard locked</h1>
+          <p className="text-sm text-slate-600 mt-1">Enter the executive PIN to continue.</p>
+          <form onSubmit={handlePinSubmit} className="mt-5">
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pinInput}
+              onChange={(e) => { setPinInput(e.target.value); setPinError('') }}
+              placeholder="Enter PIN"
+              autoFocus
+              className="w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
+            />
+            {pinError && (
+              <div className="text-red-700 text-sm font-semibold mt-2">{pinError}</div>
+            )}
+            <button
+              type="submit"
+              disabled={!pinInput}
+              className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-base transition-colors"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main dashboard (only renders after PIN is verified) ──
   const [rows, setRows] = useState([])
   const [settings, setSettings] = useState(null)
   const [sortKey, setSortKey] = useState('queue_number')
