@@ -213,7 +213,7 @@ export default function Dashboard() {
     try {
       const { data, error: rpcError } = await supabase.rpc('verify_admin_pin', { p_pin: trimmed })
       if (rpcError) throw rpcError
-      if (data === true) {
+      if (data) {
         setAdminPin(trimmed)
         setUnlocked(true)
         try {
