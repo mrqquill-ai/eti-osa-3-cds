@@ -37,7 +37,14 @@ export default function Dashboard() {
 
   function handlePinSubmit(e) {
     e.preventDefault()
-    if (pinInput === DASHBOARD_PIN) {
+    const trimmed = pinInput.trim()
+    if (!DASHBOARD_PIN) {
+      // No PIN configured — let them through
+      setUnlocked(true)
+      try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
+      return
+    }
+    if (trimmed === DASHBOARD_PIN) {
       setUnlocked(true)
       setPinError('')
       try { sessionStorage.setItem('dashboard_unlocked', 'yes') } catch {}
