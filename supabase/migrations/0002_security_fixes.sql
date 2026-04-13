@@ -296,7 +296,9 @@ begin
   end if;
 
   insert into public.registrations_archive
-    select r.*, now() from public.registrations r;
+    (id, state_code, full_name, queue_number, batch_number, registered_at, served_at, voided, device_id, session_date, archived_at)
+    select r.id, r.state_code, r.full_name, r.queue_number, r.batch_number, r.registered_at, r.served_at, r.voided, r.device_id, current_date, now()
+    from public.registrations r;
 
   delete from public.registrations where id is not null;
 

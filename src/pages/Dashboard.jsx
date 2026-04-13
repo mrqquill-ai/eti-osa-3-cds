@@ -9,7 +9,8 @@ import {
   Search,
   AlertTriangle,
   PlayCircle,
-  Lock
+  Lock,
+  Download
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
@@ -51,7 +52,28 @@ export default function Dashboard() {
   const [rowBusy, setRowBusy] = useState(null)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
+  const [showCallWaveConfirm, setShowCallWaveConfirm] = useState(false)
   const settingsRef = useRef(null)
+  const lastActivityRef = useRef(Date.now())
+
+  // Session timeout: re-lock after 15 minutes of inactivity.
+  useEffect(() => {
+    if (!unlocked) return
+    function resetTimer() { lastActivityRef.current = Date.now() }
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
+    events.forEach((e) => window.addEventListener(e, resetTimer))
+    const check = setInterval(() => {
+      if (Date.now() - lastActivityRef.current > 15 * 60 * 1000) {
+        setUnlocked(false)
+        setAdminPin('')
+        try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin') } catch {}
+      }
+    }, 30000)
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, resetTimer))
+      clearInterval(check)
+    }
+  }, [unlocked])
 
   // Close settings menu on outside click.
   useEffect(() => {
@@ -71,7 +93,7 @@ export default function Dashboard() {
 
     async function load() {
       const [regResp, setResp] = await Promise.all([
-        supabase.from('registrations').select('*').order('queue_number', { ascending: true }),
+        supabase.from('registrations').select('*').order('queue_number', { ascending: true }).limit(2000),
         supabase.from('session_settings').select('*').eq('id', 1).single()
       ])
       if (cancelled) return
@@ -163,7 +185,7 @@ export default function Dashboard() {
     ).length
   }, [rows, nextBatchNumber])
 
-  const sessionActive = settings && settings.current_batch >= 0 && counts.registered > 0
+  const sessionActive = settings && (settings.current_batch > 0 || counts.registered > 0)
 
   const filteredAndSortedRows = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
@@ -262,8 +284,32 @@ export default function Dashboard() {
     if (nextBatchCount === 0) {
       setShowEmptyBatchConfirm(true)
     } else {
-      callNextBatch()
+      setShowCallWaveConfirm(true)
     }
+  }
+
+  function exportCSV() {
+    const headers = ['Queue #', 'Full Name', 'State Code', 'Wave', 'Registered At', 'Served At', 'Voided']
+    const csvRows = [headers.join(',')]
+    for (const r of rows) {
+      csvRows.push([
+        r.queue_number,
+        `"${r.full_name.replace(/"/g, '""')}"`,
+        r.state_code,
+        r.batch_number,
+        new Date(r.registered_at).toLocaleString('en-NG'),
+        r.served_at ? new Date(r.served_at).toLocaleString('en-NG') : '',
+        r.voided ? 'Yes' : ''
+      ].join(','))
+    }
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `clearance-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    flash('CSV downloaded.')
   }
 
   async function goBackBatch() {
@@ -397,6 +443,14 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Default PIN warning */}
+      {adminPin === '2025' && (
+        <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          You are using the default PIN. Change it under Settings &gt; Change PIN.
+        </div>
+      )}
+
       {/* ── Top bar: title + settings overflow ── */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
@@ -442,6 +496,13 @@ export default function Dashboard() {
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                   Change PIN
+                </button>
+                <button
+                  onClick={() => { exportCSV(); setShowSettingsMenu(false) }}
+                  disabled={rows.length === 0}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export CSV
                 </button>
                 <hr className="my-1 border-slate-200" />
                 <button
@@ -694,6 +755,30 @@ export default function Dashboard() {
               className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 active:bg-red-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold transition-colors"
             >
               Yes, reset everything
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showCallWaveConfirm && (
+        <Modal onClose={() => setShowCallWaveConfirm(false)}>
+          <h2 className="text-lg font-extrabold text-slate-950">Call Wave {nextBatchNumber}?</h2>
+          <p className="text-slate-800 text-sm mt-2">
+            This will notify {nextBatchCount} corps member{nextBatchCount !== 1 ? 's' : ''} in Wave {nextBatchNumber} that their wave is being served.
+          </p>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button
+              onClick={() => setShowCallWaveConfirm(false)}
+              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setShowCallWaveConfirm(false); callNextBatch() }}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold transition-colors"
+            >
+              Call wave
             </button>
           </div>
         </Modal>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId } from '../lib/supabase.js'
 
@@ -31,6 +31,10 @@ export default function Join() {
   const [busy, setBusy] = useState(false)
   const [registrationOpen, setRegistrationOpen] = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [lookupCode, setLookupCode] = useState('')
+  const [lookupBusy, setLookupBusy] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [recheckingGeo, setRecheckingGeo] = useState(false)
   const retryCount = useRef(0)
 
   // Poll registration status
@@ -50,14 +54,15 @@ export default function Join() {
     return () => clearInterval(interval)
   }, [])
 
-  // Check geolocation
-  useEffect(() => {
+  // Geolocation check function (reusable for recheck)
+  const checkLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setGeoState('error')
       return
     }
 
     setGeoState('checking')
+    setRecheckingGeo(true)
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -66,11 +71,8 @@ export default function Join() {
         setUserCoords({ lat, lng })
         const dist = haversineDistance(lat, lng, VENUE_LAT, VENUE_LNG)
         setDistance(Math.round(dist))
-        if (dist <= RADIUS_METERS) {
-          setGeoState('allowed')
-        } else {
-          setGeoState('too_far')
-        }
+        setGeoState(dist <= RADIUS_METERS ? 'allowed' : 'too_far')
+        setRecheckingGeo(false)
       },
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
@@ -78,10 +80,38 @@ export default function Join() {
         } else {
           setGeoState('error')
         }
+        setRecheckingGeo(false)
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
   }, [])
+
+  // Check geolocation on mount
+  useEffect(() => { checkLocation() }, [checkLocation])
+
+  // Lookup existing registration
+  async function handleLookup() {
+    const code = normalizeStateCode(lookupCode)
+    if (!code) return
+    setLookupBusy(true)
+    setLookupError('')
+    try {
+      const { data } = await supabase
+        .from('registrations')
+        .select('state_code')
+        .eq('state_code', code)
+        .eq('voided', false)
+        .maybeSingle()
+      if (data) {
+        navigate(`/status/${encodeURIComponent(data.state_code)}`)
+      } else {
+        setLookupError('No registration found for this state code today.')
+      }
+    } catch {
+      setLookupError('Could not check. Try again.')
+    }
+    setLookupBusy(false)
+  }
 
   function handleStateCodeBlur() {
     const code = normalizeStateCode(stateCode)
@@ -181,7 +211,7 @@ export default function Join() {
   if (!registrationOpen) {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x1F6AB;</div>
+        <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
         <h1 className="text-2xl font-extrabold text-amber-900">Registration closed</h1>
         <p className="text-amber-800 mt-2">Registration is closed for the day. Please check back tomorrow.</p>
       </CenteredCard>
@@ -191,9 +221,9 @@ export default function Join() {
   if (geoState === 'checking') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3 animate-pulse">&#x1F4CD;</div>
+        <div className="text-5xl mb-3 animate-pulse">{'\uD83D\uDCCD'}</div>
         <h1 className="text-xl font-extrabold text-slate-900">Checking your location...</h1>
-        <p className="text-slate-600 mt-2 text-sm">
+        <p className="text-slate-700 mt-2 text-sm">
           Please allow location access when prompted.
         </p>
       </CenteredCard>
@@ -203,16 +233,17 @@ export default function Join() {
   if (geoState === 'denied') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x1F6AB;</div>
+        <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
         <h1 className="text-xl font-extrabold text-red-900">Location access denied</h1>
-        <p className="text-slate-600 mt-2 text-sm">
-          You need to allow location access to join the queue. Open your browser settings, enable location for this site, then refresh the page.
+        <p className="text-slate-700 mt-2 text-sm">
+          You need to allow location access to join the queue. Open your browser settings, enable location for this site, then tap Retry.
         </p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl"
+          onClick={checkLocation}
+          disabled={recheckingGeo}
+          className="mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-xl"
         >
-          Retry
+          {recheckingGeo ? 'Checking...' : 'Retry'}
         </button>
       </CenteredCard>
     )
@@ -221,21 +252,22 @@ export default function Join() {
   if (geoState === 'too_far') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x1F4CD;</div>
+        <div className="text-5xl mb-3">{'\uD83D\uDCCD'}</div>
         <h1 className="text-xl font-extrabold text-red-900">You are not at the venue</h1>
-        <p className="text-slate-600 mt-2 text-sm">
+        <p className="text-slate-700 mt-2 text-sm">
           You must be at <span className="font-semibold">Jamatul Islamiyya Primary School, Baale St, Lekki</span> to join the queue.
         </p>
         {distance != null && (
-          <p className="text-slate-500 text-xs mt-2">
+          <p className="text-slate-600 text-xs mt-2">
             You are approximately {distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} away.
           </p>
         )}
         <button
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl"
+          onClick={checkLocation}
+          disabled={recheckingGeo}
+          className="mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-xl"
         >
-          Check again
+          {recheckingGeo ? 'Checking...' : 'Check again'}
         </button>
       </CenteredCard>
     )
@@ -244,16 +276,17 @@ export default function Join() {
   if (geoState === 'error') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x26A0;&#xFE0F;</div>
+        <div className="text-5xl mb-3">{'\u26A0\uFE0F'}</div>
         <h1 className="text-xl font-extrabold text-slate-900">Location unavailable</h1>
-        <p className="text-slate-600 mt-2 text-sm">
+        <p className="text-slate-700 mt-2 text-sm">
           We could not determine your location. Make sure location services are enabled on your phone and try again.
         </p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl"
+          onClick={checkLocation}
+          disabled={recheckingGeo}
+          className="mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-xl"
         >
-          Retry
+          {recheckingGeo ? 'Checking...' : 'Retry'}
         </button>
       </CenteredCard>
     )
@@ -265,15 +298,15 @@ export default function Join() {
       <div className="max-w-md mx-auto p-4 sm:p-6">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mt-6">
           <h2 className="text-xl font-extrabold text-slate-900 text-center">Confirm your details</h2>
-          <p className="text-slate-600 text-sm text-center mt-1">Please check that everything is correct.</p>
+          <p className="text-slate-700 text-sm text-center mt-1">Please check that everything is correct.</p>
 
           <div className="mt-5 space-y-3">
             <div className="bg-slate-50 rounded-xl p-4">
-              <div className="text-xs uppercase text-slate-500 font-bold">Full name</div>
+              <div className="text-xs uppercase text-slate-600 font-bold">Full name</div>
               <div className="text-lg font-semibold text-slate-900 mt-0.5">{fullName.trim()}</div>
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
-              <div className="text-xs uppercase text-slate-500 font-bold">State code</div>
+              <div className="text-xs uppercase text-slate-600 font-bold">State code</div>
               <div className="text-lg font-semibold text-slate-900 font-mono mt-0.5">{normalizeStateCode(stateCode)}</div>
             </div>
           </div>
@@ -310,12 +343,12 @@ export default function Join() {
     <div className="max-w-md mx-auto p-4 sm:p-6">
       <div className="text-center mt-4">
         <div className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-          <span>&#x2705;</span> You are at the venue
+          <span>{'\u2705'}</span> You are at the venue
         </div>
       </div>
 
       <h1 className="text-2xl font-extrabold text-slate-900 mt-4 text-center">Join the Queue</h1>
-      <p className="text-slate-600 text-sm text-center">Eti-Osa 3 Special CDS Clearance</p>
+      <p className="text-slate-700 text-sm text-center">Eti-Osa 3 Special CDS Clearance</p>
 
       <form onSubmit={handleFormSubmit} className="mt-5 bg-white rounded-2xl shadow border border-slate-200 p-5 space-y-4">
         <label className="block">
@@ -324,6 +357,7 @@ export default function Join() {
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            maxLength={200}
             autoComplete="name"
             autoCapitalize="words"
             className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3 text-lg"
@@ -340,6 +374,7 @@ export default function Join() {
             onChange={(e) => { setStateCode(e.target.value.toUpperCase()); setStateCodeError('') }}
             onBlur={handleStateCodeBlur}
             onFocus={() => setStateCodeError('')}
+            maxLength={20}
             autoComplete="off"
             autoCapitalize="characters"
             className={`mt-1 w-full rounded-lg border-2 focus:outline-none px-3 py-3 text-lg font-mono tracking-wider ${stateCodeError ? 'border-red-400 focus:border-red-500' : 'border-slate-300 focus:border-emerald-700'}`}
@@ -366,7 +401,34 @@ export default function Join() {
         </button>
       </form>
 
-      <p className="text-[11px] text-slate-400 text-center mt-4">
+      {/* Already registered lookup */}
+      <div className="mt-4 bg-white rounded-2xl shadow border border-slate-200 p-4">
+        <p className="text-sm font-semibold text-slate-700 text-center">Already registered?</p>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="text"
+            value={lookupCode}
+            onChange={(e) => { setLookupCode(e.target.value.toUpperCase()); setLookupError('') }}
+            maxLength={20}
+            autoComplete="off"
+            autoCapitalize="characters"
+            className="flex-1 rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-2.5 text-sm font-mono tracking-wider"
+            placeholder="Enter state code"
+          />
+          <button
+            onClick={handleLookup}
+            disabled={lookupBusy || !lookupCode.trim()}
+            className="bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold px-4 py-2.5 rounded-lg text-sm whitespace-nowrap"
+          >
+            {lookupBusy ? 'Checking...' : 'Check status'}
+          </button>
+        </div>
+        {lookupError && (
+          <p className="text-red-700 text-xs font-semibold mt-1.5">{lookupError}</p>
+        )}
+      </div>
+
+      <p className="text-[11px] text-slate-500 text-center mt-4">
         After joining, you will see your queue number and can track your status live.
       </p>
     </div>

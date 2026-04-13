@@ -18,7 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/status/:stateCode" element={<Status />} />
           <Route path="/join" element={<Join />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="*" element={<Navigate to="/manager" replace />} />
+          <Route path="*" element={<Navigate to="/join" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

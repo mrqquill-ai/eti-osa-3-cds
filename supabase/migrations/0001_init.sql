@@ -56,6 +56,7 @@ create table if not exists public.registrations_archive (
   served_at      timestamptz,
   voided         boolean default false,
   device_id      text,
+  session_date   date,
   archived_at    timestamptz not null default now()
 );
 
@@ -135,7 +136,9 @@ set search_path = public
 as $$
 begin
   insert into public.registrations_archive
-    select r.*, now() from public.registrations r;
+    (id, state_code, full_name, queue_number, batch_number, registered_at, served_at, voided, device_id, session_date, archived_at)
+    select r.id, r.state_code, r.full_name, r.queue_number, r.batch_number, r.registered_at, r.served_at, r.voided, r.device_id, current_date, now()
+    from public.registrations r;
 
   -- Supabase blocks bare DELETEs as a safety net; the explicit WHERE
   -- clause satisfies the check while still removing every row.

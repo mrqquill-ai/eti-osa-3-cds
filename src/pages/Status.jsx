@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 
 export default function Status() {
@@ -11,6 +11,7 @@ export default function Status() {
   const [batchMembers, setBatchMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const prevWaveServing = useRef(null)
 
   // Initial load.
   useEffect(() => {
@@ -32,7 +33,6 @@ export default function Status() {
         setNotFound(true)
       } else {
         setReg(r)
-        // Load batch members for this person's batch
         const { data: members } = await supabase
           .from('registrations')
           .select('id, full_name, state_code, queue_number, batch_number, served_at, voided')
@@ -41,7 +41,10 @@ export default function Status() {
           .order('queue_number', { ascending: true })
         if (!cancelled && members) setBatchMembers(members)
       }
-      if (s) setSettings(s)
+      if (s) {
+        setSettings(s)
+        prevWaveServing.current = s.current_batch
+      }
       setLoading(false)
     }
     load()
@@ -70,9 +73,21 @@ export default function Status() {
       }
 
       setReg(r)
-      if (s) setSettings(s)
+      if (s) {
+        // Vibrate when this person's wave starts being served
+        if (
+          prevWaveServing.current !== s.current_batch &&
+          s.current_batch === r.batch_number &&
+          !r.served_at
+        ) {
+          try {
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
+          } catch {}
+        }
+        prevWaveServing.current = s.current_batch
+        setSettings(s)
+      }
 
-      // Refresh batch members
       const { data: members } = await supabase
         .from('registrations')
         .select('id, full_name, state_code, queue_number, batch_number, served_at, voided')
@@ -87,18 +102,24 @@ export default function Status() {
   }, [code, notFound])
 
   if (loading) {
-    return <CenteredCard><p className="text-slate-500">Loading...</p></CenteredCard>
+    return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
   }
 
   if (notFound || !reg) {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x2753;</div>
+        <div className="text-5xl mb-3">{'\u2753'}</div>
         <h1 className="text-2xl font-extrabold text-slate-900">No active registration</h1>
-        <p className="text-slate-600 mt-2">
+        <p className="text-slate-700 mt-2">
           We could not find <span className="font-mono font-bold">{code}</span> in today's queue.
-          Please see an executive at the registration desk.
         </p>
+        <Link
+          to="/join"
+          className="inline-block mt-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-6 rounded-xl"
+        >
+          Join the queue
+        </Link>
+        <p className="text-slate-500 text-xs mt-2">Or see an executive at the registration desk.</p>
       </CenteredCard>
     )
   }
@@ -106,9 +127,9 @@ export default function Status() {
   if (reg.voided) {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">&#x26A0;&#xFE0F;</div>
+        <div className="text-5xl mb-3">{'\u26A0\uFE0F'}</div>
         <h1 className="text-2xl font-extrabold text-slate-900">Entry voided</h1>
-        <p className="text-slate-600 mt-2">Please return to the registration desk.</p>
+        <p className="text-slate-700 mt-2">Please return to the registration desk.</p>
       </CenteredCard>
     )
   }
@@ -122,7 +143,7 @@ export default function Status() {
   if (isCleared) {
     statusBlock = (
       <div className="bg-emerald-100 border-2 border-emerald-600 text-emerald-900 rounded-2xl p-6 text-center">
-        <div className="text-6xl">&#x2705;</div>
+        <div className="text-6xl">{'\u2705'}</div>
         <div className="text-2xl font-extrabold mt-2">Cleared</div>
         <div className="text-sm mt-1">You are done. Have a great day.</div>
       </div>
@@ -130,40 +151,39 @@ export default function Status() {
   } else if (isBeingServed) {
     statusBlock = (
       <div className="bg-amber-100 border-2 border-amber-500 text-amber-900 rounded-2xl p-6 text-center animate-pulse">
-        <div className="text-6xl">&#x1F514;</div>
+        <div className="text-6xl">{'\uD83D\uDD14'}</div>
         <div className="text-2xl font-extrabold mt-2">Your wave is now being served</div>
         <div className="text-base mt-1">Head to clearance immediately.</div>
       </div>
     )
   } else if (currentBatch > 0 && batchesAhead > 0) {
     statusBlock = (
-      <div className="bg-slate-100 border-2 border-slate-300 text-slate-800 rounded-2xl p-6 text-center">
-        <div className="text-6xl">&#x23F3;</div>
+      <div className="bg-slate-100 border-2 border-slate-300 text-slate-900 rounded-2xl p-6 text-center">
+        <div className="text-6xl">{'\u23F3'}</div>
         <div className="text-2xl font-extrabold mt-2">Waiting</div>
         <div className="text-base mt-1">
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
-        <div className="text-sm mt-1 text-slate-600">
+        <div className="text-sm mt-1 text-slate-700">
           Wave {currentBatch} is being served now &mdash; {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
         </div>
       </div>
     )
   } else {
     statusBlock = (
-      <div className="bg-slate-100 border-2 border-slate-300 text-slate-800 rounded-2xl p-6 text-center">
-        <div className="text-6xl">&#x23F3;</div>
+      <div className="bg-slate-100 border-2 border-slate-300 text-slate-900 rounded-2xl p-6 text-center">
+        <div className="text-6xl">{'\u23F3'}</div>
         <div className="text-2xl font-extrabold mt-2">Waiting</div>
         <div className="text-base mt-1">
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
-        <div className="text-sm mt-1 text-slate-600">
+        <div className="text-sm mt-1 text-slate-700">
           Clearance has not started yet
         </div>
       </div>
     )
   }
 
-  // Batch queue stats
   const batchServed = batchMembers.filter((m) => !!m.served_at).length
   const batchTotal = batchMembers.length
 
@@ -172,9 +192,9 @@ export default function Status() {
       {/* Personal status card */}
       <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mt-4">
         <div className="text-center">
-          <div className="text-xs uppercase tracking-wider text-emerald-700 font-bold">Eti-Osa 3 Special CDS &middot; Clearance</div>
+          <div className="text-xs uppercase tracking-wider text-emerald-700 font-bold">Eti-Osa 3 Special CDS {'\u00B7'} Clearance</div>
           <div className="mt-1 text-2xl font-extrabold text-slate-900 break-words">{reg.full_name}</div>
-          <div className="text-slate-500 text-sm font-mono">{reg.state_code}</div>
+          <div className="text-slate-700 text-sm font-mono">{reg.state_code}</div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-5">
@@ -185,17 +205,17 @@ export default function Status() {
             </div>
           </div>
           <div className="bg-slate-100 rounded-xl p-4 text-center">
-            <div className="text-xs uppercase text-slate-600 font-bold">Your wave</div>
+            <div className="text-xs uppercase text-slate-700 font-bold">Your wave</div>
             <div className="text-5xl font-extrabold text-slate-900 leading-none mt-1">
               {reg.batch_number}
             </div>
           </div>
         </div>
 
-        <div className="mt-3 text-center text-sm text-slate-600">
+        <div className="mt-3 text-center text-sm text-slate-700">
           {currentBatch > 0
             ? <>Now serving wave <span className="font-extrabold text-slate-900">{currentBatch}</span></>
-            : <span className="text-slate-500">Clearance has not started yet</span>}
+            : <span className="text-slate-600">Clearance has not started yet</span>}
         </div>
 
         <div className="mt-5">{statusBlock}</div>
@@ -207,9 +227,9 @@ export default function Status() {
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <div>
               <div className="font-extrabold text-slate-900 text-sm">Wave {reg.batch_number} Queue</div>
-              <div className="text-xs text-slate-500">{batchServed} of {batchTotal} served</div>
+              <div className="text-xs text-slate-600">{batchServed} of {batchTotal} served</div>
             </div>
-            <div className="bg-slate-100 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-700">
+            <div className="bg-slate-100 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800">
               {batchTotal} members
             </div>
           </div>
@@ -224,7 +244,7 @@ export default function Status() {
                     isYou ? 'bg-emerald-50' : ''
                   }`}
                 >
-                  <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-extrabold text-slate-700 flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-extrabold text-slate-800 flex-shrink-0">
                     {m.queue_number}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -232,14 +252,14 @@ export default function Status() {
                       {isYou ? m.full_name : m.full_name.split(' ')[0]}
                       {isYou && <span className="ml-1.5 text-[10px] bg-emerald-200 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full uppercase">You</span>}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">
+                    <div className="text-xs text-slate-600 font-mono">
                       {isYou ? m.state_code : m.state_code.replace(/(\w{2}\/\w+\/)(\d+)/, (_, prefix, digits) => prefix + digits.slice(0, 2) + '***')}
                     </div>
                   </div>
                   <div className={`text-xs font-bold flex-shrink-0 ${
-                    served ? 'text-emerald-700' : 'text-slate-500'
+                    served ? 'text-emerald-700' : 'text-slate-600'
                   }`}>
-                    {served ? '&#x2713; Served' : 'Waiting'}
+                    {served ? '\u2713 Served' : 'Waiting'}
                   </div>
                 </div>
               )
@@ -248,7 +268,7 @@ export default function Status() {
         </div>
       )}
 
-      <p className="text-[11px] text-slate-400 text-center mt-4 mb-6">
+      <p className="text-[11px] text-slate-500 text-center mt-4 mb-6">
         This page refreshes every 30 seconds. Keep it open.
       </p>
     </div>
