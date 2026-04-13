@@ -97,18 +97,34 @@ export default function Status() {
       if (members) setBatchMembers(members)
     }
 
-    // Poll faster (10s) when wave is being served, slower (30s) otherwise
-    let interval
-    function startPolling() {
-      clearInterval(interval)
-      const isActive = reg && settings && settings.current_batch === reg.batch_number && !reg.served_at
-      interval = setInterval(poll, isActive ? 10000 : 30000)
-    }
-    startPolling()
-    // Re-evaluate interval on state changes
-    const recheckInterval = setInterval(startPolling, 15000)
-    return () => { clearInterval(interval); clearInterval(recheckInterval) }
+    const interval = setInterval(poll, 30000)
+    return () => clearInterval(interval)
   }, [code, notFound])
+
+  // Separate effect: poll faster (every 10s) when this person's wave is being served
+  useEffect(() => {
+    if (!reg || !settings || reg.served_at) return
+    if (settings.current_batch !== reg.batch_number) return
+    // Wave is active — add a faster poll on top of the 30s one
+    const fastPoll = setInterval(async () => {
+      const [{ data: r }, { data: s }] = await Promise.all([
+        supabase.from('registrations').select('*').eq('state_code', code).eq('voided', false).maybeSingle(),
+        supabase.from('session_settings').select('*').eq('id', 1).single()
+      ])
+      if (r) setReg(r)
+      if (s) setSettings(s)
+      if (r) {
+        const { data: members } = await supabase
+          .from('registrations')
+          .select('id, full_name, state_code, queue_number, batch_number, served_at, voided')
+          .eq('batch_number', r.batch_number)
+          .eq('voided', false)
+          .order('queue_number', { ascending: true })
+        if (members) setBatchMembers(members)
+      }
+    }, 10000)
+    return () => clearInterval(fastPoll)
+  }, [reg?.batch_number, reg?.served_at, settings?.current_batch, code])
 
   if (loading) {
     return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
