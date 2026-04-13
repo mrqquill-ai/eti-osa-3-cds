@@ -97,8 +97,17 @@ export default function Status() {
       if (members) setBatchMembers(members)
     }
 
-    const interval = setInterval(poll, 30000)
-    return () => clearInterval(interval)
+    // Poll faster (10s) when wave is being served, slower (30s) otherwise
+    let interval
+    function startPolling() {
+      clearInterval(interval)
+      const isActive = reg && settings && settings.current_batch === reg.batch_number && !reg.served_at
+      interval = setInterval(poll, isActive ? 10000 : 30000)
+    }
+    startPolling()
+    // Re-evaluate interval on state changes
+    const recheckInterval = setInterval(startPolling, 15000)
+    return () => { clearInterval(interval); clearInterval(recheckInterval) }
   }, [code, notFound])
 
   if (loading) {
@@ -165,8 +174,11 @@ export default function Status() {
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
         <div className="text-sm mt-1 text-slate-700">
-          Wave {currentBatch} is being served now &mdash; {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
+          Wave {currentBatch} is being served now {'\u2014'} {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
         </div>
+        {batchesAhead > 0 && (
+          <div className="text-xs mt-1 text-slate-600">Estimated wait: ~{batchesAhead * 10}-{batchesAhead * 15} minutes</div>
+        )}
       </div>
     )
   } else {
@@ -269,7 +281,7 @@ export default function Status() {
       )}
 
       <p className="text-[11px] text-slate-500 text-center mt-4 mb-6">
-        This page refreshes every 30 seconds. Keep it open.
+        This page refreshes automatically. Keep it open.
       </p>
     </div>
   )

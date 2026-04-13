@@ -53,22 +53,34 @@ export default function Dashboard() {
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [showCallWaveConfirm, setShowCallWaveConfirm] = useState(false)
+  const [tablePage, setTablePage] = useState(0)
+  const TABLE_PAGE_SIZE = 100
   const settingsRef = useRef(null)
   const lastActivityRef = useRef(Date.now())
 
-  // Session timeout: re-lock after 15 minutes of inactivity.
+  const [timeoutWarning, setTimeoutWarning] = useState(false)
+  const [pinAttempts, setPinAttempts] = useState(0)
+  const [pinLockUntil, setPinLockUntil] = useState(0)
+  const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
+  const [newBatchSize, setNewBatchSize] = useState(30)
+
+  // Session timeout: re-lock after 15 minutes of inactivity, warn at 13 min.
   useEffect(() => {
     if (!unlocked) return
-    function resetTimer() { lastActivityRef.current = Date.now() }
+    function resetTimer() { lastActivityRef.current = Date.now(); setTimeoutWarning(false) }
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll']
     events.forEach((e) => window.addEventListener(e, resetTimer))
     const check = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > 15 * 60 * 1000) {
+      const idle = Date.now() - lastActivityRef.current
+      if (idle > 15 * 60 * 1000) {
         setUnlocked(false)
         setAdminPin('')
+        setTimeoutWarning(false)
         try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin') } catch {}
+      } else if (idle > 13 * 60 * 1000) {
+        setTimeoutWarning(true)
       }
-    }, 30000)
+    }, 10000)
     return () => {
       events.forEach((e) => window.removeEventListener(e, resetTimer))
       clearInterval(check)
@@ -187,6 +199,14 @@ export default function Dashboard() {
 
   const sessionActive = settings && (settings.current_batch > 0 || counts.registered > 0)
 
+  // Current wave progress
+  const currentWaveProgress = useMemo(() => {
+    if (!settings || settings.current_batch <= 0) return null
+    const waveRows = rows.filter(r => !r.voided && r.batch_number === settings.current_batch)
+    const served = waveRows.filter(r => !!r.served_at).length
+    return { served, total: waveRows.length }
+  }, [rows, settings])
+
   const filteredAndSortedRows = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
     let list = rows
@@ -230,6 +250,13 @@ export default function Dashboard() {
     const trimmed = pinInput.trim()
     if (!trimmed) return
 
+    // Brute-force protection: lock after 5 failed attempts for 60 seconds
+    if (pinLockUntil > Date.now()) {
+      const secsLeft = Math.ceil((pinLockUntil - Date.now()) / 1000)
+      setPinError(`Too many attempts. Try again in ${secsLeft} seconds.`)
+      return
+    }
+
     setBusy(true)
     setPinError('')
     try {
@@ -238,12 +265,21 @@ export default function Dashboard() {
       if (data) {
         setAdminPin(trimmed)
         setUnlocked(true)
+        setPinAttempts(0)
         try {
           sessionStorage.setItem('dashboard_unlocked', 'yes')
           sessionStorage.setItem('admin_pin', trimmed)
         } catch {}
       } else {
-        setPinError('Wrong PIN. Try again.')
+        const attempts = pinAttempts + 1
+        setPinAttempts(attempts)
+        if (attempts >= 5) {
+          const lockTime = Date.now() + 60000 * Math.min(attempts - 4, 5) // 1-5 min escalating
+          setPinLockUntil(lockTime)
+          setPinError(`Too many wrong attempts. Locked for ${Math.ceil((lockTime - Date.now()) / 60000)} minute(s).`)
+        } else {
+          setPinError(`Wrong PIN. ${5 - attempts} attempt(s) remaining.`)
+        }
         setPinInput('')
       }
     } catch (err) {
@@ -352,14 +388,32 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
 
+  const [showDaySummary, setShowDaySummary] = useState(null)
+
   async function resetDay() {
+    // Capture summary before reset
+    const summary = { registered: counts.registered, served: counts.served, waiting: counts.waiting, waves: settings?.current_batch || 0 }
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: settings?.batch_size ?? 30 })
       if (e) throw e
       setShowResetConfirm(false)
       setResetConfirmText('')
-      flash('Day reset and archived.')
+      setShowDaySummary(summary)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function changeBatchSize() {
+    if (newBatchSize < 10 || newBatchSize > 100) {
+      setError('Wave size must be between 10 and 100.')
+      return
+    }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.from('session_settings').update({ batch_size: newBatchSize }).eq('id', 1)
+      if (e) throw e
+      flash(`Wave size changed to ${newBatchSize}. Applies to new registrations.`)
+      setShowChangeBatchSize(false)
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -443,6 +497,14 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Timeout warning */}
+      {timeoutWarning && (
+        <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2 animate-pulse">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          Session will lock in ~2 minutes due to inactivity. Tap anywhere to stay logged in.
+        </div>
+      )}
+
       {/* Default PIN warning */}
       {adminPin === '2025' && (
         <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
@@ -490,6 +552,13 @@ export default function Dashboard() {
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                   Start new session
+                </button>
+                <button
+                  onClick={() => { setShowChangeBatchSize(true); setNewBatchSize(settings?.batch_size ?? 30); setShowSettingsMenu(false) }}
+                  disabled={!settings}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors"
+                >
+                  Change wave size
                 </button>
                 <button
                   onClick={() => { setShowChangePinModal(true); setShowSettingsMenu(false) }}
@@ -567,7 +636,12 @@ export default function Dashboard() {
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Stat label="Now serving" value={settings?.current_batch ? `Wave ${settings.current_batch}` : 'None'} accent />
+        <Stat
+          label="Now serving"
+          value={settings?.current_batch ? `Wave ${settings.current_batch}` : 'None'}
+          subtitle={currentWaveProgress ? `${currentWaveProgress.served}/${currentWaveProgress.total} served` : null}
+          accent
+        />
         <Stat label="Registered" value={counts.registered} />
         <Stat label="Waiting" value={counts.waiting} />
         <Stat label="Served" value={counts.served} />
@@ -579,7 +653,7 @@ export default function Dashboard() {
         <input
           type="text"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => { setSearchQuery(e.target.value); setTablePage(0) }}
           placeholder="Search by name or state code..."
           className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none bg-white text-slate-950 placeholder-slate-500"
         />
@@ -614,7 +688,7 @@ export default function Dashboard() {
                   </td>
                 </tr>
               )}
-              {filteredAndSortedRows.map((r, i) => (
+              {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map((r, i) => (
                 <tr
                   key={r.id}
                   className={`border-t border-slate-100 transition-colors ${
@@ -657,6 +731,7 @@ export default function Dashboard() {
                       <button
                         onClick={() => r.voided ? toggleVoid(r) : setShowVoidConfirm(r)}
                         disabled={rowBusy === r.id}
+                        aria-label={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
                         title={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
                         className={`p-1.5 rounded transition-colors ${
                           r.voided
@@ -674,10 +749,33 @@ export default function Dashboard() {
           </table>
         </div>
         {filteredAndSortedRows.length > 0 && (
-          <div className="px-3 py-1.5 border-t border-slate-200 text-xs text-slate-600 bg-slate-50 font-medium flex-shrink-0">
-            {searchQuery
-              ? `${filteredAndSortedRows.length} of ${rows.length} entries`
-              : `${rows.length} entries total`}
+          <div className="px-3 py-1.5 border-t border-slate-200 text-xs text-slate-600 bg-slate-50 font-medium flex-shrink-0 flex items-center justify-between">
+            <span>
+              {searchQuery
+                ? `${filteredAndSortedRows.length} of ${rows.length} entries`
+                : `${rows.length} entries total`}
+            </span>
+            {filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setTablePage(p => Math.max(0, p - 1))}
+                  disabled={tablePage === 0}
+                  className="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-40 font-bold"
+                  aria-label="Previous page"
+                >
+                  {'\u2190'}
+                </button>
+                <span className="px-1">{tablePage + 1}/{Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE)}</span>
+                <button
+                  onClick={() => setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1))}
+                  disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
+                  className="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-40 font-bold"
+                  aria-label="Next page"
+                >
+                  {'\u2192'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -833,6 +931,61 @@ export default function Dashboard() {
         </Modal>
       )}
 
+      {showDaySummary && (
+        <Modal onClose={() => setShowDaySummary(null)}>
+          <h2 className="text-lg font-extrabold text-slate-950">{'\u2705'} Day reset complete</h2>
+          <p className="text-slate-700 text-sm mt-2">All entries have been archived. Here is today's summary:</p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 rounded-lg p-3 text-center">
+              <div className="text-xs uppercase text-slate-600 font-bold">Registered</div>
+              <div className="text-2xl font-extrabold text-slate-900">{showDaySummary.registered}</div>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <div className="text-xs uppercase text-emerald-700 font-bold">Served</div>
+              <div className="text-2xl font-extrabold text-emerald-900">{showDaySummary.served}</div>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-3 text-center">
+              <div className="text-xs uppercase text-amber-700 font-bold">Still waiting</div>
+              <div className="text-2xl font-extrabold text-amber-900">{showDaySummary.waiting}</div>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 text-center">
+              <div className="text-xs uppercase text-slate-600 font-bold">Waves called</div>
+              <div className="text-2xl font-extrabold text-slate-900">{showDaySummary.waves}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDaySummary(null)}
+            className="w-full mt-5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition-colors"
+          >
+            Done
+          </button>
+        </Modal>
+      )}
+
+      {showChangeBatchSize && (
+        <Modal onClose={() => setShowChangeBatchSize(false)}>
+          <h2 className="text-lg font-extrabold text-slate-950">Change wave size</h2>
+          <p className="text-slate-700 text-sm mt-1">
+            New size applies to future registrations only. Already-assigned wave numbers stay the same.
+          </p>
+          <label className="block mt-4">
+            <span className="text-sm font-bold text-slate-900">Wave size (10-100)</span>
+            <input
+              type="number"
+              min={10}
+              max={100}
+              value={newBatchSize}
+              onChange={(e) => setNewBatchSize(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-2.5 text-lg text-slate-950"
+            />
+          </label>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => setShowChangeBatchSize(false)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button onClick={changeBatchSize} disabled={busy || newBatchSize < 10 || newBatchSize > 100} className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold transition-colors">Save</button>
+          </div>
+        </Modal>
+      )}
+
       {showChangePinModal && (
         <Modal onClose={() => { setShowChangePinModal(false); setNewPinInput('') }}>
           <h2 className="text-lg font-extrabold text-slate-950">Change PIN</h2>
@@ -869,7 +1022,7 @@ export default function Dashboard() {
 }
 
 // ── Stat card ─────────────────────────────────────────────
-function Stat({ label, value, accent }) {
+function Stat({ label, value, subtitle, accent }) {
   return (
     <div className={`rounded-xl p-3 border-2 ${
       accent
@@ -880,6 +1033,7 @@ function Stat({ label, value, accent }) {
         accent ? 'text-amber-800' : 'text-slate-600'
       }`}>{label}</div>
       <div className="text-2xl font-extrabold leading-tight mt-0.5">{value}</div>
+      {subtitle && <div className={`text-xs font-semibold mt-0.5 ${accent ? 'text-amber-700' : 'text-slate-500'}`}>{subtitle}</div>}
     </div>
   )
 }

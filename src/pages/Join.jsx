@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId } from '../lib/supabase.js'
+import { useNavigate, Link } from 'react-router-dom'
+import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId, friendlyNetworkError } from '../lib/supabase.js'
 
 // Jamatul Islamiyya Primary School, 52 Baale St, Lekki Peninsula II
 const VENUE_LAT = 6.4360344
@@ -16,6 +16,38 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+// Compute next CDS day. Clearance = first Friday of each month, General CDS = last Friday.
+function getNextCDSDay() {
+  const today = new Date()
+  const candidates = []
+
+  // Check current month and next 2 months
+  for (let offset = 0; offset < 3; offset++) {
+    const year = today.getFullYear()
+    const month = today.getMonth() + offset
+    const d = new Date(year, month, 1)
+    const m = d.getMonth()
+    const y = d.getFullYear()
+
+    // First Friday of the month (Clearance day)
+    const firstDay = new Date(y, m, 1)
+    const firstFriday = new Date(y, m, 1 + ((5 - firstDay.getDay() + 7) % 7))
+    if (firstFriday > today) {
+      candidates.push({ date: firstFriday, type: 'Clearance day' })
+    }
+
+    // Last Friday of the month (General CDS day)
+    const lastDay = new Date(y, m + 1, 0) // last day of month
+    const lastFriday = new Date(y, m + 1, 0 - ((lastDay.getDay() + 2) % 7))
+    if (lastFriday > today) {
+      candidates.push({ date: lastFriday, type: 'General CDS day' })
+    }
+  }
+
+  candidates.sort((a, b) => a.date - b.date)
+  return candidates[0] || null
 }
 
 export default function Join() {
@@ -122,7 +154,7 @@ export default function Join() {
     }
   }
 
-  function handleFormSubmit(e) {
+  async function handleFormSubmit(e) {
     e.preventDefault()
     setError('')
     setStateCodeError('')
@@ -135,6 +167,22 @@ export default function Join() {
     if (!STATE_CODE_REGEX.test(code)) {
       setStateCodeError('State code format: XX/00X/0000 - e.g. LA/24A/1234 or LA/25B/11622.')
       return
+    }
+
+    // Quick duplicate check before showing confirmation
+    try {
+      const { data } = await supabase
+        .from('registrations')
+        .select('state_code')
+        .eq('state_code', code)
+        .eq('voided', false)
+        .maybeSingle()
+      if (data) {
+        setError(`duplicate:${code}`)
+        return
+      }
+    } catch {
+      // Network error — let them proceed, server will catch duplicates
     }
 
     // Show confirmation step
@@ -167,22 +215,21 @@ export default function Join() {
         if (rpcError) {
           const msg = rpcError.message || ''
           if (msg.includes('duplicate_state_code')) {
-            setError('You have already registered today.')
+            setError(`duplicate:${code}`)
           } else if (msg.includes('registration_closed')) {
             setError('Registration is closed for the day.')
           } else if (msg.includes('device_limit_reached')) {
             setError('You have already registered on this phone. If you need help, see an executive at the desk.')
           } else if (msg.includes('outside_geofence')) {
             setError('You must be at the venue to register. Move closer and try again.')
-          } else if (msg.toLowerCase().includes('failed to fetch')) {
-            // Auto-retry up to 3 times on network errors
+          } else if (friendlyNetworkError(msg)) {
             if (retryCount.current < 3) {
               retryCount.current += 1
               setError(`Network error. Retrying... (${retryCount.current}/3)`)
               setTimeout(attempt, 2000 * retryCount.current)
               return
             }
-            setError('No internet connection. Check your data or Wi-Fi and try again.')
+            setError(friendlyNetworkError(msg))
           } else {
             setError(msg || 'Could not register. Try again.')
           }
@@ -209,11 +256,41 @@ export default function Join() {
   // --- Render ---
 
   if (!registrationOpen) {
+    const nextDay = getNextCDSDay()
     return (
       <CenteredCard>
         <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
         <h1 className="text-2xl font-extrabold text-amber-900">Registration closed</h1>
-        <p className="text-amber-800 mt-2">Registration is closed for the day. Please check back tomorrow.</p>
+        <p className="text-amber-800 mt-2">Registration is closed for the day.</p>
+        {nextDay && (
+          <p className="text-amber-800 mt-2 text-sm">
+            Next: <span className="font-bold">{nextDay.type}</span> {'\u2014'} {nextDay.date.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        )}
+        {/* Already registered? lookup */}
+        <div className="mt-4 pt-4 border-t border-amber-300">
+          <p className="text-amber-800 text-sm font-semibold">Already registered today?</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              type="text"
+              value={lookupCode}
+              onChange={(e) => { setLookupCode(e.target.value.toUpperCase()); setLookupError('') }}
+              maxLength={20}
+              autoComplete="off"
+              autoCapitalize="characters"
+              className="flex-1 rounded-lg border-2 border-amber-300 focus:border-amber-600 focus:outline-none px-3 py-2 text-sm font-mono tracking-wider"
+              placeholder="State code"
+            />
+            <button
+              onClick={handleLookup}
+              disabled={lookupBusy || !lookupCode.trim()}
+              className="bg-amber-700 hover:bg-amber-800 disabled:bg-slate-400 text-white font-bold px-3 py-2 rounded-lg text-sm"
+            >
+              {lookupBusy ? '...' : 'Check'}
+            </button>
+          </div>
+          {lookupError && <p className="text-red-700 text-xs font-semibold mt-1">{lookupError}</p>}
+        </div>
       </CenteredCard>
     )
   }
@@ -236,8 +313,12 @@ export default function Join() {
         <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
         <h1 className="text-xl font-extrabold text-red-900">Location access denied</h1>
         <p className="text-slate-700 mt-2 text-sm">
-          You need to allow location access to join the queue. Open your browser settings, enable location for this site, then tap Retry.
+          You need to allow location access to join the queue.
         </p>
+        <ul className="text-slate-700 text-sm text-left mt-2 space-y-1 list-disc pl-5">
+          <li><strong>iPhone:</strong> Settings {'\u2192'} Safari {'\u2192'} Location {'\u2192'} Allow</li>
+          <li><strong>Android:</strong> Tap the lock icon in the address bar {'\u2192'} Permissions {'\u2192'} Location {'\u2192'} Allow</li>
+        </ul>
         <button
           onClick={checkLocation}
           disabled={recheckingGeo}
@@ -279,8 +360,14 @@ export default function Join() {
         <div className="text-5xl mb-3">{'\u26A0\uFE0F'}</div>
         <h1 className="text-xl font-extrabold text-slate-900">Location unavailable</h1>
         <p className="text-slate-700 mt-2 text-sm">
-          We could not determine your location. Make sure location services are enabled on your phone and try again.
+          We could not determine your location. Try these steps:
         </p>
+        <ul className="text-slate-700 text-sm text-left mt-2 space-y-1 list-disc pl-5">
+          <li>Make sure <strong>Location Services</strong> are turned on in your phone settings</li>
+          <li>Move to an open area (away from buildings)</li>
+          <li>Turn off battery saver mode</li>
+          <li>Close and reopen your browser</li>
+        </ul>
         <button
           onClick={checkLocation}
           disabled={recheckingGeo}
@@ -298,7 +385,7 @@ export default function Join() {
       <div className="max-w-md mx-auto p-4 sm:p-6">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mt-6">
           <h2 className="text-xl font-extrabold text-slate-900 text-center">Confirm your details</h2>
-          <p className="text-slate-700 text-sm text-center mt-1">Please check that everything is correct.</p>
+          <p className="text-slate-700 text-sm text-center mt-1">After confirming, you will get a queue number and can track your status live on your phone.</p>
 
           <div className="mt-5 space-y-3">
             <div className="bg-slate-50 rounded-xl p-4">
@@ -313,7 +400,14 @@ export default function Join() {
 
           {error && (
             <div className="mt-4 bg-red-50 border-2 border-red-300 text-red-800 rounded-lg px-3 py-2 text-sm font-semibold">
-              {error}
+              {error.startsWith('duplicate:') ? (
+                <>
+                  You have already registered today.
+                  <Link to={`/status/${encodeURIComponent(error.replace('duplicate:', ''))}`} className="block mt-1.5 text-emerald-700 underline font-bold">
+                    View your status page {'\u2192'}
+                  </Link>
+                </>
+              ) : error}
             </div>
           )}
 
