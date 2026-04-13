@@ -10,7 +10,13 @@ import {
   AlertTriangle,
   PlayCircle,
   Lock,
-  Download
+  Download,
+  Shield,
+  Plus,
+  Pencil,
+  Trash2,
+  LockKeyhole,
+  Unlock
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
@@ -33,6 +39,24 @@ export default function Dashboard() {
   const [unlocked, setUnlocked] = useState(() => {
     try { return sessionStorage.getItem('dashboard_unlocked') === 'yes' } catch { return false }
   })
+  const [role, setRole] = useState(() => {
+    try { return sessionStorage.getItem('admin_role') || 'executive' } catch { return 'executive' }
+  })
+  const isSuperAdmin = role === 'super_admin'
+
+  // Super admin modals
+  const [showAddRegModal, setShowAddRegModal] = useState(false)
+  const [addRegName, setAddRegName] = useState('')
+  const [addRegCode, setAddRegCode] = useState('')
+  const [showEditModal, setShowEditModal] = useState(null)
+  const [editName, setEditName] = useState('')
+  const [editCode, setEditCode] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+  const [showSuperPinModal, setShowSuperPinModal] = useState(false)
+  const [newSuperPin, setNewSuperPin] = useState('')
+  const [pinLocked, setPinLocked] = useState(false)
+  const [showForceExecPinModal, setShowForceExecPinModal] = useState(false)
+  const [forceExecPin, setForceExecPin] = useState('')
 
   const [rows, setRows] = useState([])
   const [settings, setSettings] = useState(null)
@@ -75,8 +99,9 @@ export default function Dashboard() {
       if (idle > 15 * 60 * 1000) {
         setUnlocked(false)
         setAdminPin('')
+        setRole('executive')
         setTimeoutWarning(false)
-        try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin') } catch {}
+        try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin'); sessionStorage.removeItem('admin_role') } catch {}
       } else if (idle > 13 * 60 * 1000) {
         setTimeoutWarning(true)
       }
@@ -164,7 +189,8 @@ export default function Dashboard() {
       // Force re-lock
       setUnlocked(false)
       setAdminPin('')
-      try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin') } catch {}
+      setRole('executive')
+      try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin'); sessionStorage.removeItem('admin_role') } catch {}
     } else if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
       friendly = 'Database not set up yet. Open the Supabase SQL editor and run the migration files, then reload this page.'
     } else if (raw.includes('relation') && raw.includes('does not exist')) {
@@ -260,15 +286,32 @@ export default function Dashboard() {
     setBusy(true)
     setPinError('')
     try {
-      const { data, error: rpcError } = await supabase.rpc('verify_admin_pin', { p_pin: trimmed })
-      if (rpcError) throw rpcError
-      if (data) {
+      // Try the new verify_login first (returns role), fall back to verify_admin_pin
+      let detectedRole = null
+      const { data: roleData, error: roleErr } = await supabase.rpc('verify_login', { p_pin: trimmed })
+      if (!roleErr && roleData) {
+        detectedRole = roleData
+      } else {
+        // Fallback if migration not yet run
+        const { data: legacyData, error: legacyErr } = await supabase.rpc('verify_admin_pin', { p_pin: trimmed })
+        if (legacyErr) throw legacyErr
+        if (legacyData) detectedRole = 'executive'
+      }
+
+      if (detectedRole) {
         setAdminPin(trimmed)
+        setRole(detectedRole)
         setUnlocked(true)
         setPinAttempts(0)
+        // Fetch pin_locked status
+        try {
+          const { data: lockData } = await supabase.rpc('get_pin_lock_status', { p_pin: trimmed })
+          if (typeof lockData === 'boolean') setPinLocked(lockData)
+        } catch {}
         try {
           sessionStorage.setItem('dashboard_unlocked', 'yes')
           sessionStorage.setItem('admin_pin', trimmed)
+          sessionStorage.setItem('admin_role', detectedRole)
         } catch {}
       } else {
         const attempts = pinAttempts + 1
@@ -425,12 +468,113 @@ export default function Dashboard() {
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.rpc('admin_change_pin', { p_current_pin: adminPin, p_new_pin: newPinInput })
-      if (e) throw e
-      setAdminPin(newPinInput)
-      try { sessionStorage.setItem('admin_pin', newPinInput) } catch {}
+      if (e) {
+        if (e.message?.includes('pin_is_locked')) {
+          setError('The executive PIN is locked by the super admin. Only the super admin can change it.')
+          setBusy(false)
+          return
+        }
+        throw e
+      }
+      // If super admin changed exec PIN, don't update own PIN
+      if (!isSuperAdmin) {
+        setAdminPin(newPinInput)
+        try { sessionStorage.setItem('admin_pin', newPinInput) } catch {}
+      }
       setShowChangePinModal(false)
       setNewPinInput('')
-      flash('PIN changed successfully.')
+      flash('Executive PIN changed successfully.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  // ── Super Admin actions ─────────────────────────────────
+  async function superAddRegistration() {
+    const name = addRegName.trim()
+    const code = addRegCode.trim().toUpperCase().replace(/\s+/g, '')
+    if (!name || name.length < 2) { setError('Name must be at least 2 characters.'); return }
+    if (!code) { setError('Enter a state code.'); return }
+    setBusy(true); setError('')
+    try {
+      const { data, error: e } = await supabase.rpc('super_admin_add_registration', {
+        p_super_pin: adminPin, p_state_code: code, p_full_name: name
+      })
+      if (e) throw e
+      flash(`Added ${name} — Q#${data.queue_number}, Wave ${data.batch_number}`)
+      setShowAddRegModal(false); setAddRegName(''); setAddRegCode('')
+    } catch (e) {
+      const msg = e?.message || ''
+      if (msg.includes('duplicate_state_code')) setError('This state code is already registered today.')
+      else if (msg.includes('invalid_super_admin_pin')) setError('Super admin access required.')
+      else showError(e)
+    } finally { setBusy(false) }
+  }
+
+  async function superEditRegistration() {
+    if (!showEditModal) return
+    const name = editName.trim()
+    const code = editCode.trim().toUpperCase().replace(/\s+/g, '')
+    if (!name || name.length < 2) { setError('Name must be at least 2 characters.'); return }
+    if (!code) { setError('Enter a state code.'); return }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_edit_registration', {
+        p_super_pin: adminPin, p_registration_id: showEditModal.id, p_full_name: name, p_state_code: code
+      })
+      if (e) throw e
+      flash(`Updated ${name}.`)
+      setShowEditModal(null)
+    } catch (e) {
+      const msg = e?.message || ''
+      if (msg.includes('duplicate_state_code')) setError('That state code is already in use.')
+      else showError(e)
+    } finally { setBusy(false) }
+  }
+
+  async function superDeleteRegistration() {
+    if (!showDeleteConfirm) return
+    setRowBusy(showDeleteConfirm.id); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_delete_registration', {
+        p_super_pin: adminPin, p_registration_id: showDeleteConfirm.id
+      })
+      if (e) throw e
+      flash(`Permanently deleted ${showDeleteConfirm.full_name}.`)
+      setShowDeleteConfirm(null)
+    } catch (e) { showError(e) } finally { setRowBusy(null) }
+  }
+
+  async function superTogglePinLock() {
+    setBusy(true); setError('')
+    try {
+      const { data, error: e } = await supabase.rpc('super_admin_toggle_pin_lock', { p_super_pin: adminPin })
+      if (e) throw e
+      setPinLocked(data)
+      flash(data ? 'Executive PIN is now locked. Executives cannot change it.' : 'Executive PIN is now unlocked. Executives can change it.')
+      setShowSettingsMenu(false)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function superForceExecPin() {
+    if (forceExecPin.length < 4) { setError('PIN must be at least 4 characters.'); return }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_set_exec_pin', { p_super_pin: adminPin, p_new_pin: forceExecPin })
+      if (e) throw e
+      flash('Executive PIN has been changed.')
+      setShowForceExecPinModal(false); setForceExecPin('')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function superChangeSuperPin() {
+    if (newSuperPin.length < 6) { setError('Super admin PIN must be at least 6 characters.'); return }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_change_pin', { p_current_super_pin: adminPin, p_new_super_pin: newSuperPin })
+      if (e) throw e
+      setAdminPin(newSuperPin)
+      try { sessionStorage.setItem('admin_pin', newSuperPin) } catch {}
+      flash('Super admin PIN changed.')
+      setShowSuperPinModal(false); setNewSuperPin('')
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -453,7 +597,7 @@ export default function Dashboard() {
             </div>
           </div>
           <h1 className="text-xl font-extrabold text-slate-950">Dashboard locked</h1>
-          <p className="text-sm text-slate-600 mt-1">Enter the executive PIN to continue.</p>
+          <p className="text-sm text-slate-600 mt-1">Enter your PIN to continue.</p>
           <form onSubmit={handlePinSubmit} className="mt-5">
             <input
               type="password"
@@ -509,17 +653,40 @@ export default function Dashboard() {
       {adminPin === '2025' && (
         <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          You are using the default PIN. Change it under Settings &gt; Change PIN.
+          You are using the default executive PIN. Change it under Settings {'\u2192'} Change executive PIN.
+        </div>
+      )}
+      {isSuperAdmin && adminPin === 'SUPERADMIN2025' && (
+        <div className="mb-3 bg-purple-100 border-2 border-purple-400 text-purple-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
+          <Shield className="w-4 h-4 flex-shrink-0" />
+          You are using the default super admin PIN. Change it under Settings {'\u2192'} Change super admin PIN.
         </div>
       )}
 
-      {/* ── Top bar: title + settings overflow ── */}
+      {/* ── Top bar: title + role badge + settings overflow ── */}
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-950">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold text-slate-950">Dashboard</h1>
+            {isSuperAdmin && (
+              <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <Shield className="w-3 h-3" /> Super Admin
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-600 font-medium">Eti-Osa 3 Special CDS</p>
         </div>
         <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button
+              onClick={() => { setShowAddRegModal(true); setAddRegName(''); setAddRegCode(''); setError('') }}
+              className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-800 active:bg-purple-900 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors"
+              aria-label="Add registration"
+            >
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
+          )}
           {!sessionActive && (
             <button
               onClick={() => setShowStartModal(true)}
@@ -560,12 +727,15 @@ export default function Dashboard() {
                 >
                   Change wave size
                 </button>
-                <button
-                  onClick={() => { setShowChangePinModal(true); setShowSettingsMenu(false) }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  Change PIN
-                </button>
+                {/* Executive PIN change — hidden if locked and not super admin */}
+                {(isSuperAdmin || !pinLocked) && (
+                  <button
+                    onClick={() => { setShowChangePinModal(true); setShowSettingsMenu(false) }}
+                    className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
+                  >
+                    Change executive PIN
+                  </button>
+                )}
                 <button
                   onClick={() => { exportCSV(); setShowSettingsMenu(false) }}
                   disabled={rows.length === 0}
@@ -573,6 +743,39 @@ export default function Dashboard() {
                 >
                   <Download className="w-3.5 h-3.5" /> Export CSV
                 </button>
+                {/* Super admin only settings */}
+                {isSuperAdmin && (
+                  <>
+                    <hr className="my-1 border-purple-200" />
+                    <div className="px-4 py-1 text-[10px] uppercase tracking-wider font-bold text-purple-600">Super Admin</div>
+                    <button
+                      onClick={() => { setShowAddRegModal(true); setAddRegName(''); setAddRegCode(''); setError(''); setShowSettingsMenu(false) }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add registration
+                    </button>
+                    <button
+                      onClick={() => { setShowForceExecPinModal(true); setForceExecPin(''); setShowSettingsMenu(false) }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                    >
+                      <LockKeyhole className="w-3.5 h-3.5" /> Set executive PIN
+                    </button>
+                    <button
+                      onClick={superTogglePinLock}
+                      disabled={busy}
+                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                    >
+                      {pinLocked ? <Unlock className="w-3.5 h-3.5" /> : <LockKeyhole className="w-3.5 h-3.5" />}
+                      {pinLocked ? 'Unlock exec PIN changes' : 'Lock exec PIN changes'}
+                    </button>
+                    <button
+                      onClick={() => { setShowSuperPinModal(true); setNewSuperPin(''); setShowSettingsMenu(false) }}
+                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                    >
+                      <Shield className="w-3.5 h-3.5" /> Change super admin PIN
+                    </button>
+                  </>
+                )}
                 <hr className="my-1 border-slate-200" />
                 <button
                   onClick={() => { setShowResetConfirm(true); setShowSettingsMenu(false) }}
@@ -741,6 +944,28 @@ export default function Dashboard() {
                       >
                         {r.voided ? <RotateCcw className="w-4 h-4" /> : <X className="w-4 h-4" />}
                       </button>
+                      {isSuperAdmin && (
+                        <>
+                          <button
+                            onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
+                            disabled={rowBusy === r.id}
+                            aria-label={`Edit ${r.full_name}`}
+                            title={`Edit ${r.full_name}`}
+                            className="p-1.5 rounded text-purple-500 hover:text-purple-700 hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-30"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(r)}
+                            disabled={rowBusy === r.id}
+                            aria-label={`Delete ${r.full_name}`}
+                            title={`Permanently delete ${r.full_name}`}
+                            className="p-1.5 rounded text-red-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200 transition-colors disabled:opacity-30"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -988,15 +1213,15 @@ export default function Dashboard() {
 
       {showChangePinModal && (
         <Modal onClose={() => { setShowChangePinModal(false); setNewPinInput('') }}>
-          <h2 className="text-lg font-extrabold text-slate-950">Change PIN</h2>
+          <h2 className="text-lg font-extrabold text-slate-950">Change executive PIN</h2>
           <p className="text-slate-700 text-sm mt-1">
-            Enter a new PIN (at least 4 characters).
+            Enter a new executive PIN (at least 4 characters). All executives will use this PIN.
           </p>
           <input
             type="password"
             value={newPinInput}
             onChange={(e) => setNewPinInput(e.target.value)}
-            placeholder="New PIN"
+            placeholder="New executive PIN"
             autoFocus
             className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
           />
@@ -1013,6 +1238,183 @@ export default function Dashboard() {
               className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold transition-colors"
             >
               Save new PIN
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Super Admin Modals ── */}
+      {showAddRegModal && (
+        <Modal onClose={() => setShowAddRegModal(false)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-5 h-5 text-purple-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Add registration</h2>
+          </div>
+          <p className="text-slate-700 text-sm">Add a corps member directly (bypasses geofence and device limits).</p>
+          <div className="mt-4 space-y-3">
+            <label className="block">
+              <span className="text-sm font-bold text-slate-900">Full name</span>
+              <input
+                type="text"
+                value={addRegName}
+                onChange={(e) => setAddRegName(e.target.value)}
+                maxLength={200}
+                autoFocus
+                autoCapitalize="words"
+                className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 text-slate-950"
+                placeholder="e.g. Adaeze Okonkwo"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-bold text-slate-900">State code</span>
+              <input
+                type="text"
+                value={addRegCode}
+                onChange={(e) => setAddRegCode(e.target.value.toUpperCase())}
+                maxLength={20}
+                autoCapitalize="characters"
+                className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 font-mono tracking-wider text-slate-950"
+                placeholder="LA/24A/1234"
+              />
+            </label>
+          </div>
+          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => setShowAddRegModal(false)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button
+              onClick={superAddRegistration}
+              disabled={busy || !addRegName.trim() || !addRegCode.trim()}
+              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              {busy ? 'Adding...' : 'Add to queue'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showEditModal && (
+        <Modal onClose={() => setShowEditModal(null)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Pencil className="w-5 h-5 text-purple-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Edit registration</h2>
+          </div>
+          <p className="text-slate-600 text-sm">Q#{showEditModal.queue_number} {'\u00B7'} Wave {showEditModal.batch_number}</p>
+          <div className="mt-4 space-y-3">
+            <label className="block">
+              <span className="text-sm font-bold text-slate-900">Full name</span>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                maxLength={200}
+                autoFocus
+                className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 text-slate-950"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-bold text-slate-900">State code</span>
+              <input
+                type="text"
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                maxLength={20}
+                className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 font-mono tracking-wider text-slate-950"
+              />
+            </label>
+          </div>
+          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => setShowEditModal(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button
+              onClick={superEditRegistration}
+              disabled={busy || !editName.trim() || !editCode.trim()}
+              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              {busy ? 'Saving...' : 'Save changes'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showDeleteConfirm && (
+        <Modal onClose={() => setShowDeleteConfirm(null)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Trash2 className="w-5 h-5 text-red-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Permanently delete?</h2>
+          </div>
+          <p className="text-slate-800 text-sm mt-2">
+            This will permanently remove <strong>{showDeleteConfirm.full_name}</strong> (<span className="font-mono">{showDeleteConfirm.state_code}</span>) from the queue. Unlike voiding, this <strong>cannot be undone</strong>.
+          </p>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => setShowDeleteConfirm(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button
+              onClick={superDeleteRegistration}
+              disabled={busy}
+              className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 disabled:bg-slate-300 text-white font-bold transition-colors"
+            >
+              Delete permanently
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showForceExecPinModal && (
+        <Modal onClose={() => { setShowForceExecPinModal(false); setForceExecPin('') }}>
+          <div className="flex items-center gap-2 mb-1">
+            <LockKeyhole className="w-5 h-5 text-purple-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Set executive PIN</h2>
+          </div>
+          <p className="text-slate-700 text-sm mt-1">
+            Force-set the executive PIN. All executives will need to use this new PIN.
+          </p>
+          <input
+            type="password"
+            value={forceExecPin}
+            onChange={(e) => setForceExecPin(e.target.value)}
+            placeholder="New executive PIN"
+            autoFocus
+            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-3"
+          />
+          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => { setShowForceExecPinModal(false); setForceExecPin('') }} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button
+              onClick={superForceExecPin}
+              disabled={busy || forceExecPin.length < 4}
+              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              Set PIN
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showSuperPinModal && (
+        <Modal onClose={() => { setShowSuperPinModal(false); setNewSuperPin('') }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-5 h-5 text-purple-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Change super admin PIN</h2>
+          </div>
+          <p className="text-slate-700 text-sm mt-1">
+            Enter a new super admin PIN (at least 6 characters). Only you should know this.
+          </p>
+          <input
+            type="password"
+            value={newSuperPin}
+            onChange={(e) => setNewSuperPin(e.target.value)}
+            placeholder="New super admin PIN"
+            autoFocus
+            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-3"
+          />
+          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => { setShowSuperPinModal(false); setNewSuperPin('') }} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button
+              onClick={superChangeSuperPin}
+              disabled={busy || newSuperPin.length < 6}
+              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
+            >
+              Save
             </button>
           </div>
         </Modal>
