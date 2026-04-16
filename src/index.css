@@ -9,3 +9,30 @@ html, body, #root {
 body {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Dark mode for dashboard */
+.dark-dashboard {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.dark-dashboard .bg-white { background: #1e293b !important; }
+.dark-dashboard .bg-slate-50 { background: #1e293b !important; }
+.dark-dashboard .bg-slate-100 { background: #334155 !important; }
+.dark-dashboard .bg-slate-200 { background: #475569 !important; }
+.dark-dashboard .text-slate-950,
+.dark-dashboard .text-slate-900,
+.dark-dashboard .text-slate-800 { color: #e2e8f0 !important; }
+.dark-dashboard .text-slate-700,
+.dark-dashboard .text-slate-600,
+.dark-dashboard .text-slate-500 { color: #94a3b8 !important; }
+.dark-dashboard .border-slate-200,
+.dark-dashboard .border-slate-100 { border-color: #334155 !important; }
+.dark-dashboard .border-slate-300 { border-color: #475569 !important; }
+.dark-dashboard input,
+.dark-dashboard textarea { background: #1e293b !important; color: #e2e8f0 !important; border-color: #475569 !important; }
+.dark-dashboard input::placeholder,
+.dark-dashboard textarea::placeholder { color: #64748b !important; }
+.dark-dashboard table thead { background: #334155 !important; }
+.dark-dashboard table tbody tr:nth-child(even) { background: #1e293b !important; }
+.dark-dashboard table tbody tr:nth-child(odd) { background: #0f172a !important; }
+.dark-dashboard .shadow, .dark-dashboard .shadow-lg { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3) !important; }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { QRCodeCanvas } from 'qrcode.react'
-import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError } from '../lib/supabase.js'
+import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError, getDeviceId } from '../lib/supabase.js'
 
 export default function Manager() {
   const [fullName, setFullName] = useState('')
@@ -22,7 +22,7 @@ export default function Manager() {
   const [lookupError, setLookupError] = useState('')
   const retryCount = useRef(0)
 
-  // Poll registration_open flag every 10 seconds.
+  // Poll registration_open flag every 10 seconds + heartbeat.
   useEffect(() => {
     let cancelled = false
 
@@ -35,6 +35,8 @@ export default function Manager() {
           .single()
         if (!cancelled && data) setRegistrationOpen(data.registration_open)
       } catch {}
+      // Heartbeat for executive session tracking
+      try { await supabase.rpc('exec_heartbeat', { p_device_id: getDeviceId() || 'unknown', p_page: 'manager' }) } catch {}
     }
     check()
     const interval = setInterval(check, 10000)

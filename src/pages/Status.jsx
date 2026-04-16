@@ -217,8 +217,15 @@ export default function Status() {
 
   return (
     <div className="max-w-md mx-auto p-4 sm:p-6">
+      {/* Announcement banner */}
+      {settings?.announcement && (
+        <div className="bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 mt-4 text-sm font-semibold text-center">
+          {'\uD83D\uDCE2'} {settings.announcement}
+        </div>
+      )}
+
       {/* Personal status card */}
-      <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mt-4">
+      <div className={`bg-white rounded-2xl shadow-lg border border-slate-200 p-6 ${settings?.announcement ? 'mt-3' : 'mt-4'}`}>
         <div className="text-center">
           <div className="text-xs uppercase tracking-wider text-emerald-700 font-bold">Eti-Osa 3 Special CDS {'\u00B7'} Clearance</div>
           <div className="mt-1 text-2xl font-extrabold text-slate-900 break-words">{reg.full_name}</div>

@@ -18,6 +18,7 @@ import {
   LockKeyhole,
   Unlock
 } from 'lucide-react'
+import jsQR from 'jsqr'
 import { supabase } from '../lib/supabase.js'
 
 const SORTABLE = [
@@ -57,6 +58,34 @@ export default function Dashboard() {
   const [pinLocked, setPinLocked] = useState(false)
   const [showForceExecPinModal, setShowForceExecPinModal] = useState(false)
   const [forceExecPin, setForceExecPin] = useState('')
+
+  // Super admin panel
+  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'log','stats','announce','sessions','archives','duplicates'
+  const [activityLog, setActivityLog] = useState([])
+  const [logLoading, setLogLoading] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+  const [execSessions, setExecSessions] = useState([])
+  const [archiveDates, setArchiveDates] = useState([])
+  const [archiveRows, setArchiveRows] = useState([])
+  const [archiveDate, setArchiveDate] = useState(null)
+  const [duplicates, setDuplicates] = useState([])
+  const [showMoveWaveModal, setShowMoveWaveModal] = useState(null)
+  const [targetWave, setTargetWave] = useState(1)
+  const [showNoteModal, setShowNoteModal] = useState(null)
+  const [noteText, setNoteText] = useState('')
+  const [showSwapModal, setShowSwapModal] = useState(null)
+  const [swapTargetCode, setSwapTargetCode] = useState('')
+  const [selectedRows, setSelectedRows] = useState(new Set())
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem('dashboard_dark') === 'yes' } catch { return false }
+  })
+  const [soundEnabled, setSoundEnabled] = useState(false)
+  const [showQRScanner, setShowQRScanner] = useState(false)
+  const [qrScanning, setQrScanning] = useState(false)
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const scanIntervalRef = useRef(null)
+  const prevRegisteredRef = useRef(0)
 
   const [rows, setRows] = useState([])
   const [settings, setSettings] = useState(null)
@@ -191,6 +220,8 @@ export default function Dashboard() {
       setAdminPin('')
       setRole('executive')
       try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin'); sessionStorage.removeItem('admin_role') } catch {}
+    } else if (raw.includes('dashboard_frozen')) {
+      friendly = 'Dashboard is temporarily frozen by the super admin. Please wait.'
     } else if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
       friendly = 'Database not set up yet. Open the Supabase SQL editor and run the migration files, then reload this page.'
     } else if (raw.includes('relation') && raw.includes('does not exist')) {
@@ -565,6 +596,232 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
+  // ── Super Admin panel loaders ────────────────────────────
+  async function loadActivityLog() {
+    setLogLoading(true)
+    try {
+      const { data } = await supabase.rpc('super_admin_get_activity_log', { p_super_pin: adminPin, p_limit: 100 })
+      if (data) setActivityLog(data)
+    } catch {} finally { setLogLoading(false) }
+  }
+
+  async function loadExecSessions() {
+    try {
+      const { data } = await supabase.rpc('super_admin_get_active_sessions', { p_super_pin: adminPin })
+      if (data) setExecSessions(data)
+    } catch {}
+  }
+
+  async function loadArchiveDates() {
+    try {
+      const { data } = await supabase.rpc('super_admin_get_archive_dates', { p_super_pin: adminPin })
+      if (data) setArchiveDates(data)
+    } catch {}
+  }
+
+  async function loadArchiveForDate(date) {
+    setArchiveDate(date)
+    try {
+      const { data } = await supabase.rpc('super_admin_get_archives', { p_super_pin: adminPin, p_date: date })
+      if (data) setArchiveRows(data)
+    } catch {}
+  }
+
+  async function loadDuplicates() {
+    try {
+      const { data } = await supabase.rpc('super_admin_find_duplicates', { p_super_pin: adminPin })
+      if (data) setDuplicates(data)
+    } catch {}
+  }
+
+  async function saveAnnouncement() {
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_set_announcement', { p_super_pin: adminPin, p_announcement: announcement })
+      if (e) throw e
+      flash(announcement ? 'Announcement published to all status pages.' : 'Announcement cleared.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function toggleFreeze() {
+    setBusy(true); setError('')
+    try {
+      const { data, error: e } = await supabase.rpc('super_admin_toggle_freeze', { p_super_pin: adminPin })
+      if (e) throw e
+      flash(data ? 'Executive actions are now frozen. Only you can act.' : 'Executive actions unfrozen.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function moveToWave() {
+    if (!showMoveWaveModal || !targetWave) return
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_move_to_wave', { p_super_pin: adminPin, p_registration_id: showMoveWaveModal.id, p_target_wave: targetWave })
+      if (e) throw e
+      flash(`Moved ${showMoveWaveModal.full_name} to Wave ${targetWave}.`)
+      setShowMoveWaveModal(null)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function saveNote() {
+    if (!showNoteModal) return
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_set_note', { p_super_pin: adminPin, p_registration_id: showNoteModal.id, p_note: noteText })
+      if (e) throw e
+      flash('Note saved.')
+      setShowNoteModal(null)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  async function swapPositions() {
+    if (!showSwapModal || !swapTargetCode.trim()) return
+    const targetRow = rows.find(r => r.state_code === swapTargetCode.trim().toUpperCase())
+    if (!targetRow) { setError('State code not found in current registrations.'); return }
+    setBusy(true); setError('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_swap_positions', { p_super_pin: adminPin, p_id_a: showSwapModal.id, p_id_b: targetRow.id })
+      if (e) throw e
+      flash(`Swapped Q#${showSwapModal.queue_number} and Q#${targetRow.queue_number}.`)
+      setShowSwapModal(null); setSwapTargetCode('')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  // Bulk actions
+  async function bulkMarkServed() {
+    setBusy(true); setError('')
+    let count = 0
+    for (const id of selectedRows) {
+      try {
+        const row = rows.find(r => r.id === id)
+        if (row && !row.served_at && !row.voided) {
+          await supabase.rpc('admin_toggle_served', { p_pin: adminPin, p_registration_id: id })
+          count++
+        }
+      } catch {}
+    }
+    flash(`Marked ${count} entries as served.`)
+    setSelectedRows(new Set())
+    setBusy(false)
+  }
+
+  async function bulkVoid() {
+    setBusy(true); setError('')
+    let count = 0
+    for (const id of selectedRows) {
+      try {
+        const row = rows.find(r => r.id === id)
+        if (row && !row.voided) {
+          await supabase.rpc('admin_toggle_void', { p_pin: adminPin, p_registration_id: id })
+          count++
+        }
+      } catch {}
+    }
+    flash(`Voided ${count} entries.`)
+    setSelectedRows(new Set())
+    setBusy(false)
+  }
+
+  function toggleSelectRow(id) {
+    setSelectedRows(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function selectAllVisible() {
+    const pageRows = filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE)
+    const allSelected = pageRows.every(r => selectedRows.has(r.id))
+    if (allSelected) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(pageRows.map(r => r.id)))
+    }
+  }
+
+  // QR Scanner
+  function startQRScan() {
+    setShowQRScanner(true)
+    setQrScanning(true)
+    setTimeout(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+          scanIntervalRef.current = setInterval(() => {
+            if (!videoRef.current || !canvasRef.current) return
+            const video = videoRef.current
+            const canvas = canvasRef.current
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            const code = jsQR(imageData.data, imageData.width, imageData.height)
+            if (code && code.data) {
+              // Extract state code from URL: /status/XX/00X/0000
+              const match = code.data.match(/\/status\/([A-Z]{2}%2F\d{2}[A-Z]%2F\d+|[A-Z]{2}\/\d{2}[A-Z]\/\d+)/)
+              if (match) {
+                const stateCode = decodeURIComponent(match[1])
+                stopQRScan()
+                setSearchQuery(stateCode)
+                flash(`Found: ${stateCode}`)
+              }
+            }
+          }, 250)
+        }
+      } catch (err) {
+        setError('Could not access camera. Make sure camera permissions are allowed.')
+        setShowQRScanner(false)
+        setQrScanning(false)
+      }
+    }, 100)
+  }
+
+  function stopQRScan() {
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+    }
+    setShowQRScanner(false)
+    setQrScanning(false)
+  }
+
+  // Sound alert: play when registration count crosses thresholds
+  useEffect(() => {
+    if (!soundEnabled || !rows.length) return
+    const current = rows.filter(r => !r.voided).length
+    const thresholds = [100, 250, 500, 750, 1000]
+    for (const t of thresholds) {
+      if (prevRegisteredRef.current < t && current >= t) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)()
+          const osc = ctx.createOscillator()
+          osc.type = 'sine'
+          osc.frequency.value = 880
+          osc.connect(ctx.destination)
+          osc.start()
+          setTimeout(() => { osc.stop(); ctx.close() }, 300)
+        } catch {}
+        flash(`${'\uD83D\uDD14'} ${current} registrations reached!`)
+      }
+    }
+    prevRegisteredRef.current = current
+  }, [rows, soundEnabled])
+
+  // Load super admin panel data when tab changes
+  useEffect(() => {
+    if (!isSuperAdmin || !superTab) return
+    if (superTab === 'log') loadActivityLog()
+    if (superTab === 'sessions') loadExecSessions()
+    if (superTab === 'archives') loadArchiveDates()
+    if (superTab === 'duplicates') loadDuplicates()
+    if (superTab === 'announce' && settings) setAnnouncement(settings.announcement || '')
+  }, [superTab])
+
   async function superChangeSuperPin() {
     if (newSuperPin.length < 6) { setError('Super admin PIN must be at least 6 characters.'); return }
     setBusy(true); setError('')
@@ -626,7 +883,7 @@ export default function Dashboard() {
 
   // ── Main dashboard ────────────────────────────────────
   return (
-    <div className="max-w-5xl mx-auto p-3 sm:p-5 flex flex-col" style={{ height: 'calc(100vh - 40px)' }}>
+    <div className={`max-w-5xl mx-auto p-3 sm:p-5 flex flex-col ${darkMode ? 'dark-dashboard' : ''}`} style={{ height: 'calc(100vh - 40px)' }}>
       {/* Error banner */}
       {error && (
         <div className="mb-3 bg-red-100 border-2 border-red-500 text-red-950 rounded-xl p-3 flex items-start gap-3">
@@ -850,6 +1107,317 @@ export default function Dashboard() {
         <Stat label="Served" value={counts.served} />
       </div>
 
+      {/* Frozen banner for executives */}
+      {!isSuperAdmin && settings?.exec_frozen && (
+        <div className="mb-3 bg-blue-100 border-2 border-blue-400 text-blue-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
+          <Lock className="w-4 h-4 flex-shrink-0" />
+          Dashboard actions are temporarily frozen by the super admin. You can view data but cannot make changes.
+        </div>
+      )}
+
+      {/* ── Super Admin Panel ── */}
+      {isSuperAdmin && (
+        <div className="mb-4">
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { key: 'log', label: 'Activity Log' },
+              { key: 'stats', label: 'Live Stats' },
+              { key: 'announce', label: 'Announce' },
+              { key: 'sessions', label: 'Exec Sessions' },
+              { key: 'archives', label: 'Archives' },
+              { key: 'duplicates', label: 'Duplicates' },
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setSuperTab(superTab === t.key ? null : t.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  superTab === t.key
+                    ? 'bg-purple-700 text-white'
+                    : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+            <button
+              onClick={toggleFreeze}
+              disabled={busy}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                settings?.exec_frozen
+                  ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                  : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+              }`}
+            >
+              {settings?.exec_frozen ? '\uD83D\uDD12 Unfreeze' : '\u2744\uFE0F Freeze Execs'}
+            </button>
+            <button
+              onClick={() => { setDarkMode(d => { const v = !d; try { localStorage.setItem('dashboard_dark', v ? 'yes' : '') } catch {}; return v }); }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              {darkMode ? '\u2600\uFE0F Light' : '\uD83C\uDF19 Dark'}
+            </button>
+            <button
+              onClick={startQRScan}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              {'\uD83D\uDCF7'} Scan QR
+            </button>
+            <button
+              onClick={() => setSoundEnabled(s => !s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                soundEnabled ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {soundEnabled ? '\uD83D\uDD14 Sound On' : '\uD83D\uDD15 Sound Off'}
+            </button>
+          </div>
+
+          {/* Panel content */}
+          {superTab === 'log' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 max-h-60 overflow-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-extrabold text-purple-900">Activity Log</h3>
+                <button onClick={loadActivityLog} className="text-xs text-purple-700 underline">{logLoading ? 'Loading...' : 'Refresh'}</button>
+              </div>
+              {activityLog.length === 0 ? (
+                <p className="text-xs text-purple-700">No activity recorded yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {activityLog.map(a => (
+                    <div key={a.id} className="flex items-start gap-2 text-xs">
+                      <span className="text-purple-500 whitespace-nowrap">{new Date(a.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${a.role === 'super_admin' ? 'bg-purple-200 text-purple-800' : 'bg-slate-200 text-slate-700'}`}>{a.role === 'super_admin' ? 'SA' : 'Exec'}</span>
+                      <span className="font-semibold text-slate-900">{a.action.replace(/_/g, ' ')}</span>
+                      {a.details && <span className="text-slate-600 truncate">{'\u2014'} {a.details}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {superTab === 'stats' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <h3 className="text-sm font-extrabold text-purple-900 mb-3">Live Stats</h3>
+              {(() => {
+                const now = new Date()
+                const activeRows = rows.filter(r => !r.voided)
+                const servedRows = activeRows.filter(r => r.served_at)
+                // Registrations per hour
+                const hourBuckets = {}
+                activeRows.forEach(r => {
+                  const h = new Date(r.registered_at).getHours()
+                  hourBuckets[h] = (hourBuckets[h] || 0) + 1
+                })
+                const peakHour = Object.entries(hourBuckets).sort((a, b) => b[1] - a[1])[0]
+                // Average serve time
+                const serveTimes = servedRows.map(r => new Date(r.served_at) - new Date(r.registered_at)).filter(t => t > 0)
+                const avgServeMs = serveTimes.length ? serveTimes.reduce((a, b) => a + b, 0) / serveTimes.length : 0
+                const avgServeMins = Math.round(avgServeMs / 60000)
+                // Peak wave
+                const waveCounts = {}
+                activeRows.forEach(r => { waveCounts[r.batch_number] = (waveCounts[r.batch_number] || 0) + 1 })
+                const peakWave = Object.entries(waveCounts).sort((a, b) => b[1] - a[1])[0]
+                // Serve rate
+                const serveRate = activeRows.length ? Math.round((servedRows.length / activeRows.length) * 100) : 0
+
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase font-bold text-purple-600">Avg Clear Time</div>
+                      <div className="text-xl font-extrabold text-slate-900">{avgServeMins ? `${avgServeMins}m` : '--'}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase font-bold text-purple-600">Serve Rate</div>
+                      <div className="text-xl font-extrabold text-slate-900">{serveRate}%</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase font-bold text-purple-600">Peak Hour</div>
+                      <div className="text-xl font-extrabold text-slate-900">{peakHour ? `${peakHour[0]}:00` : '--'}</div>
+                      <div className="text-[10px] text-slate-500">{peakHour ? `${peakHour[1]} people` : ''}</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 text-center">
+                      <div className="text-[10px] uppercase font-bold text-purple-600">Busiest Wave</div>
+                      <div className="text-xl font-extrabold text-slate-900">{peakWave ? `Wave ${peakWave[0]}` : '--'}</div>
+                      <div className="text-[10px] text-slate-500">{peakWave ? `${peakWave[1]} people` : ''}</div>
+                    </div>
+                  </div>
+                )
+              })()}
+              {/* Hourly breakdown */}
+              <div className="mt-3">
+                <div className="text-[10px] uppercase font-bold text-purple-600 mb-1">Registrations by Hour</div>
+                <div className="flex items-end gap-1 h-16">
+                  {(() => {
+                    const activeRows = rows.filter(r => !r.voided)
+                    const buckets = {}
+                    activeRows.forEach(r => { const h = new Date(r.registered_at).getHours(); buckets[h] = (buckets[h] || 0) + 1 })
+                    const maxCount = Math.max(1, ...Object.values(buckets))
+                    const hours = []
+                    for (let h = 7; h <= 18; h++) hours.push(h)
+                    return hours.map(h => (
+                      <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
+                        <div
+                          className="w-full bg-purple-400 rounded-t"
+                          style={{ height: `${Math.max(2, ((buckets[h] || 0) / maxCount) * 100)}%` }}
+                          title={`${h}:00 - ${buckets[h] || 0} registrations`}
+                        />
+                        <span className="text-[8px] text-slate-500">{h}</span>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {superTab === 'announce' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <h3 className="text-sm font-extrabold text-purple-900 mb-2">Announcement</h3>
+              <p className="text-xs text-purple-700 mb-2">This message appears on every corps member's status page.</p>
+              <textarea
+                value={announcement}
+                onChange={e => setAnnouncement(e.target.value)}
+                maxLength={300}
+                rows={2}
+                placeholder="e.g. Break time: 1pm-2pm. Clearance resumes at 2pm."
+                className="w-full rounded-lg border-2 border-purple-300 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm"
+              />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-purple-500">{announcement.length}/300</span>
+                <div className="flex gap-2">
+                  {settings?.announcement && (
+                    <button onClick={() => { setAnnouncement(''); }} className="text-xs text-red-600 hover:text-red-800 font-semibold">Clear</button>
+                  )}
+                  <button onClick={saveAnnouncement} disabled={busy} className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white text-xs font-bold transition-colors">
+                    {busy ? 'Saving...' : announcement ? 'Publish' : 'Clear announcement'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {superTab === 'sessions' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-extrabold text-purple-900">Active Executive Sessions</h3>
+                <button onClick={loadExecSessions} className="text-xs text-purple-700 underline">Refresh</button>
+              </div>
+              {execSessions.length === 0 ? (
+                <p className="text-xs text-purple-700">No active sessions detected. Executives must be on /manager or /dashboard for at least 10 seconds to appear.</p>
+              ) : (
+                <div className="space-y-2">
+                  {execSessions.map((s, i) => (
+                    <div key={i} className="bg-white rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{s.page === 'manager' ? 'Check-in Desk' : 'Dashboard'}</div>
+                        <div className="text-xs text-slate-500">{s.page} page</div>
+                      </div>
+                      <div className="text-2xl font-extrabold text-purple-700">{Number(s.device_count)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {superTab === 'archives' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 max-h-72 overflow-auto">
+              <h3 className="text-sm font-extrabold text-purple-900 mb-2">Past Clearance Days</h3>
+              {archiveDates.length === 0 ? (
+                <p className="text-xs text-purple-700">No archived sessions yet. Archives are created when you Reset Day.</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {archiveDates.map(d => (
+                      <button
+                        key={d.session_date}
+                        onClick={() => loadArchiveForDate(d.session_date)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                          archiveDate === d.session_date ? 'bg-purple-700 text-white' : 'bg-white text-purple-800 hover:bg-purple-100'
+                        }`}
+                      >
+                        {new Date(d.session_date + 'T00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })} ({Number(d.entry_count)})
+                      </button>
+                    ))}
+                  </div>
+                  {archiveDate && archiveRows.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-purple-700">{archiveRows.length} entries</span>
+                        <button
+                          onClick={() => {
+                            const headers = ['Queue #', 'Name', 'State Code', 'Wave', 'Registered', 'Served', 'Voided']
+                            const csvRows = [headers.join(',')]
+                            archiveRows.forEach(r => csvRows.push([r.queue_number, `"${(r.full_name||'').replace(/"/g,'""')}"`, r.state_code, r.batch_number, r.registered_at ? new Date(r.registered_at).toLocaleString('en-NG') : '', r.served_at ? new Date(r.served_at).toLocaleString('en-NG') : '', r.voided ? 'Yes' : ''].join(',')))
+                            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+                            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `archive-${archiveDate}.csv`; a.click()
+                            flash('Archive CSV downloaded.')
+                          }}
+                          className="text-xs font-bold text-purple-700 underline"
+                        >
+                          Export CSV
+                        </button>
+                      </div>
+                      <table className="w-full text-xs">
+                        <thead><tr className="text-left text-purple-700"><th className="py-1 pr-2">Q#</th><th className="py-1 pr-2">Name</th><th className="py-1 pr-2">Code</th><th className="py-1">Status</th></tr></thead>
+                        <tbody>
+                          {archiveRows.slice(0, 50).map(r => (
+                            <tr key={r.id} className={`border-t border-purple-100 ${r.voided ? 'opacity-40' : ''}`}>
+                              <td className="py-1 pr-2 font-bold">{r.queue_number}</td>
+                              <td className="py-1 pr-2">{r.full_name}</td>
+                              <td className="py-1 pr-2 font-mono">{r.state_code}</td>
+                              <td className="py-1">{r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}</td>
+                            </tr>
+                          ))}
+                          {archiveRows.length > 50 && <tr><td colSpan={4} className="py-1 text-purple-600">...and {archiveRows.length - 50} more (export CSV for full list)</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {superTab === 'duplicates' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-extrabold text-purple-900">Duplicate Detector</h3>
+                <button onClick={loadDuplicates} className="text-xs text-purple-700 underline">Refresh</button>
+              </div>
+              {duplicates.length === 0 ? (
+                <p className="text-xs text-purple-700">No duplicates found. This checks for entries with the same name AND state code.</p>
+              ) : (
+                <div className="space-y-1">
+                  {duplicates.map((d, i) => (
+                    <div key={i} className="bg-white rounded-lg p-2 flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-bold text-slate-900">{d.full_name}</span>
+                        <span className="text-xs text-slate-500 ml-2 font-mono">{d.state_code}</span>
+                      </div>
+                      <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">{Number(d.match_count)}x</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {selectedRows.size > 0 && (
+        <div className="mb-3 bg-purple-100 border-2 border-purple-300 rounded-xl p-3 flex items-center justify-between">
+          <span className="text-sm font-bold text-purple-900">{selectedRows.size} selected</span>
+          <div className="flex gap-2">
+            <button onClick={bulkMarkServed} disabled={busy} className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white text-xs font-bold">Mark served</button>
+            <button onClick={bulkVoid} disabled={busy} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white text-xs font-bold">Void all</button>
+            <button onClick={() => setSelectedRows(new Set())} className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold">Clear</button>
+          </div>
+        </div>
+      )}
+
       {/* ── Search bar ── */}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -868,6 +1436,17 @@ export default function Dashboard() {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-200 text-slate-950 sticky top-0 z-10">
               <tr>
+                {isSuperAdmin && (
+                  <th className="px-2 py-2.5 w-8">
+                    <input
+                      type="checkbox"
+                      checked={filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).length > 0 && filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).every(r => selectedRows.has(r.id))}
+                      onChange={selectAllVisible}
+                      className="w-4 h-4 rounded accent-purple-700"
+                      aria-label="Select all on this page"
+                    />
+                  </th>
+                )}
                 {SORTABLE.map((c) => (
                   <th
                     key={c.key}
@@ -886,7 +1465,7 @@ export default function Dashboard() {
             <tbody>
               {filteredAndSortedRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500 font-medium">
+                  <td colSpan={isSuperAdmin ? 8 : 7} className="px-3 py-8 text-center text-slate-500 font-medium">
                     {searchQuery ? 'No matches found.' : 'No registrations yet.'}
                   </td>
                 </tr>
@@ -900,8 +1479,22 @@ export default function Dashboard() {
                     !r.voided && !r.served_at ? 'hover:bg-emerald-50' : ''
                   }`}
                 >
+                  {isSuperAdmin && (
+                    <td className="px-2 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(r.id)}
+                        onChange={() => toggleSelectRow(r.id)}
+                        className="w-4 h-4 rounded accent-purple-700"
+                        aria-label={`Select ${r.full_name}`}
+                      />
+                    </td>
+                  )}
                   <td className="px-3 py-2 font-extrabold text-slate-950">{r.queue_number}</td>
-                  <td className="px-3 py-2 font-semibold text-slate-950">{r.full_name}</td>
+                  <td className="px-3 py-2 font-semibold text-slate-950">
+                    {r.full_name}
+                    {isSuperAdmin && r.admin_note && <span title={r.admin_note} className="ml-1 text-purple-500 cursor-help">{'\uD83D\uDCDD'}</span>}
+                  </td>
                   <td className="px-3 py-2 font-mono text-slate-800">{r.state_code}</td>
                   <td className="px-3 py-2 text-slate-950">{r.batch_number}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-slate-800">
@@ -954,6 +1547,24 @@ export default function Dashboard() {
                             className="p-1.5 rounded text-purple-500 hover:text-purple-700 hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-30"
                           >
                             <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => { setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
+                            disabled={rowBusy === r.id}
+                            aria-label={`Move ${r.full_name} to different wave`}
+                            title="Move to wave"
+                            className="p-1.5 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => { setShowNoteModal(r); setNoteText(r.admin_note || '') }}
+                            disabled={rowBusy === r.id}
+                            aria-label={`Note on ${r.full_name}`}
+                            title="Add/edit note"
+                            className={`p-1.5 rounded transition-colors disabled:opacity-30 ${r.admin_note ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-100' : 'text-slate-400 hover:text-purple-600 hover:bg-purple-100'}`}
+                          >
+                            <Pencil className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => setShowDeleteConfirm(r)}
@@ -1385,6 +1996,67 @@ export default function Dashboard() {
             >
               Set PIN
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {showQRScanner && (
+        <Modal onClose={stopQRScan}>
+          <h2 className="text-lg font-extrabold text-slate-950 mb-2">Scan QR Code</h2>
+          <p className="text-xs text-slate-600 mb-3">Point camera at a corps member's QR code to find their entry.</p>
+          <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
+            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+            <canvas ref={canvasRef} className="hidden" />
+            <div className="absolute inset-0 border-4 border-white/30 rounded-lg pointer-events-none" />
+          </div>
+          <button onClick={stopQRScan} className="w-full mt-3 px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Close scanner</button>
+        </Modal>
+      )}
+
+      {showMoveWaveModal && (
+        <Modal onClose={() => setShowMoveWaveModal(null)}>
+          <div className="flex items-center gap-2 mb-1">
+            <ChevronRight className="w-5 h-5 text-blue-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Move to wave</h2>
+          </div>
+          <p className="text-slate-700 text-sm">Move <strong>{showMoveWaveModal.full_name}</strong> (currently Wave {showMoveWaveModal.batch_number}) to a different wave.</p>
+          <label className="block mt-4">
+            <span className="text-sm font-bold text-slate-900">Target wave</span>
+            <input
+              type="number"
+              min={1}
+              value={targetWave}
+              onChange={e => setTargetWave(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-blue-600 focus:outline-none px-3 py-2.5 text-lg text-slate-950"
+            />
+          </label>
+          <p className="text-xs text-slate-500 mt-1">Currently serving: Wave {settings?.current_batch || 0}</p>
+          <div className="mt-5 flex gap-2 justify-end">
+            <button onClick={() => setShowMoveWaveModal(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button onClick={moveToWave} disabled={busy || targetWave < 1} className="px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 disabled:bg-slate-400 text-white font-bold transition-colors">Move</button>
+          </div>
+        </Modal>
+      )}
+
+      {showNoteModal && (
+        <Modal onClose={() => setShowNoteModal(null)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Pencil className="w-5 h-5 text-purple-700" />
+            <h2 className="text-lg font-extrabold text-slate-950">Note</h2>
+          </div>
+          <p className="text-slate-600 text-sm">{showNoteModal.full_name} {'\u00B7'} Q#{showNoteModal.queue_number}</p>
+          <textarea
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            maxLength={500}
+            rows={3}
+            autoFocus
+            placeholder="Add a private note (only visible on dashboard)..."
+            className="mt-3 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm"
+          />
+          <div className="mt-4 flex gap-2 justify-end">
+            <button onClick={() => setShowNoteModal(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
+            <button onClick={saveNote} disabled={busy} className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors">{busy ? 'Saving...' : 'Save note'}</button>
           </div>
         </Modal>
       )}
