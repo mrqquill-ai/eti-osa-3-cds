@@ -1109,17 +1109,34 @@ export default function Dashboard() {
       </div>
 
       {/* ── Config strip ── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-700 mb-3 px-1">
-        <span>Wave size: <span className="text-slate-950">{settings?.batch_size ?? '-'}</span></span>
-        <span className="text-slate-300">|</span>
-        <span>
-          Registration:{' '}
-          {settings?.registration_open ? (
-            <span className="text-emerald-700">Open</span>
-          ) : (
-            <span className="text-red-700">Closed</span>
-          )}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+          <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          Wave: <strong className="text-slate-900">{settings?.batch_size ?? '-'}</strong>
         </span>
+        <span className={`inline-flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm ${
+          settings?.registration_open
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${settings?.registration_open ? 'bg-emerald-500' : 'bg-red-500'}`}/>
+          {settings?.registration_open ? 'Registration open' : 'Registration closed'}
+        </span>
+        {/* Geofencing toggle — visible to ALL (exec + super admin) */}
+        <button
+          onClick={toggleGeofencing}
+          disabled={busy || !settings}
+          title="Toggle location check on/off"
+          className={`inline-flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 ${
+            (settings?.geofencing_enabled ?? true)
+              ? 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
+              : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+          }`}
+        >
+          <span>📍</span>
+          {(settings?.geofencing_enabled ?? true) ? 'Location: ON' : 'Location: OFF'}
+          <span className={`w-1.5 h-1.5 rounded-full ml-0.5 ${(settings?.geofencing_enabled ?? true) ? 'bg-blue-500' : 'bg-amber-500'}`}/>
+        </button>
       </div>
 
       {/* ── Hero: Call next wave + Go back ── */}
@@ -1179,65 +1196,88 @@ export default function Dashboard() {
 
       {/* ── Super Admin Panel ── */}
       {isSuperAdmin && (
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-1.5">
+        <div className="mb-4 rounded-2xl overflow-hidden border-2 border-purple-200 shadow-sm">
+
+          {/* ── Panel header ── */}
+          <div className="flex items-center justify-between px-4 py-3 bg-purple-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-purple-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span className="text-white font-extrabold text-sm tracking-wide">Super Admin Controls</span>
+            </div>
+            {/* Utility icon buttons */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleFreeze}
+                disabled={busy}
+                title={settings?.exec_frozen ? 'Unfreeze executives' : 'Freeze all executive actions'}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base transition-colors ${
+                  settings?.exec_frozen
+                    ? 'bg-red-500 text-white hover:bg-red-400'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                {settings?.exec_frozen ? '\uD83D\uDD13' : '\uD83D\uDD12'}
+              </button>
+              <button
+                onClick={() => { setDarkMode(d => { const v = !d; try { localStorage.setItem('dashboard_dark', v ? 'yes' : '') } catch {}; return v }); }}
+                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/10 text-white hover:bg-white/20 transition-colors"
+              >
+                {darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19'}
+              </button>
+              <button
+                onClick={startQRScan}
+                title="Scan QR code"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/10 text-white hover:bg-white/20 transition-colors"
+              >
+                {'\uD83D\uDCF7'}
+              </button>
+              <button
+                onClick={() => setSoundEnabled(s => !s)}
+                title={soundEnabled ? 'Mute notification sounds' : 'Enable notification sounds'}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base transition-colors ${
+                  soundEnabled ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                {soundEnabled ? '\uD83D\uDD14' : '\uD83D\uDD15'}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Feature card grid ── */}
+          <div className="bg-purple-50 p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { key: 'log', label: 'Activity Log' },
-              { key: 'stats', label: 'Live Stats' },
-              { key: 'announce', label: 'Announce' },
-              { key: 'sessions', label: 'Exec Sessions' },
-              { key: 'archives', label: 'Archives' },
-              { key: 'duplicates', label: 'Duplicates' },
-              { key: 'venue', label: '📍 Venue & Location' },
+              { key: 'log',        icon: '\uD83D\uDCCB', label: 'Activity Log',  desc: 'Full audit trail' },
+              { key: 'stats',      icon: '\uD83D\uDCCA', label: 'Live Stats',    desc: 'Analytics & charts' },
+              { key: 'announce',   icon: '\uD83D\uDCE2', label: 'Announce',      desc: 'Broadcast to members' },
+              { key: 'sessions',   icon: '\uD83D\uDC65', label: 'Sessions',      desc: "Who's online" },
+              { key: 'archives',   icon: '\uD83D\uDDC4\uFE0F', label: 'Archives', desc: 'Past session data' },
+              { key: 'duplicates', icon: '\uD83D\uDD0D', label: 'Duplicates',    desc: 'Flag repeat entries' },
+              { key: 'venue',      icon: '\uD83D\uDCCD', label: 'Venue & GPS',   desc: 'Geofencing settings' },
             ].map(t => (
               <button
                 key={t.key}
                 onClick={() => setSuperTab(superTab === t.key ? null : t.key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                className={`flex items-center gap-2.5 p-3 rounded-xl text-left transition-all border-2 ${
                   superTab === t.key
-                    ? 'bg-purple-700 text-white'
-                    : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                    ? 'bg-purple-700 border-purple-700 text-white shadow-md'
+                    : 'bg-white border-transparent hover:border-purple-200 text-slate-800 shadow-sm hover:shadow'
                 }`}
               >
-                {t.label}
+                <span className="text-xl leading-none flex-shrink-0">{t.icon}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold leading-tight">{t.label}</div>
+                  <div className={`text-[10px] leading-tight mt-0.5 ${superTab === t.key ? 'text-purple-200' : 'text-slate-400'}`}>{t.desc}</div>
+                </div>
               </button>
             ))}
-            <button
-              onClick={toggleFreeze}
-              disabled={busy}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                settings?.exec_frozen
-                  ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                  : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
-              }`}
-            >
-              {settings?.exec_frozen ? '\uD83D\uDD12 Unfreeze' : '\u2744\uFE0F Freeze Execs'}
-            </button>
-            <button
-              onClick={() => { setDarkMode(d => { const v = !d; try { localStorage.setItem('dashboard_dark', v ? 'yes' : '') } catch {}; return v }); }}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-            >
-              {darkMode ? '\u2600\uFE0F Light' : '\uD83C\uDF19 Dark'}
-            </button>
-            <button
-              onClick={startQRScan}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-            >
-              {'\uD83D\uDCF7'} Scan QR
-            </button>
-            <button
-              onClick={() => setSoundEnabled(s => !s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                soundEnabled ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {soundEnabled ? '\uD83D\uDD14 Sound On' : '\uD83D\uDD15 Sound Off'}
-            </button>
           </div>
 
           {/* Panel content */}
           {superTab === 'log' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 max-h-60 overflow-auto">
+            <div className="border-t-2 border-purple-100 bg-white p-4 max-h-64 overflow-auto">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-extrabold text-purple-900">Activity Log</h3>
                 <button onClick={loadActivityLog} className="text-xs text-purple-700 underline">{logLoading ? 'Loading...' : 'Refresh'}</button>
@@ -1260,7 +1300,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'stats' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="border-t-2 border-purple-100 bg-white p-4">
               <h3 className="text-sm font-extrabold text-purple-900 mb-3">Live Stats</h3>
               {(() => {
                 const now = new Date()
@@ -1335,7 +1375,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'announce' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="border-t-2 border-purple-100 bg-white p-4">
               <h3 className="text-sm font-extrabold text-purple-900 mb-2">Announcement</h3>
               <p className="text-xs text-purple-700 mb-2">This message appears on every corps member's status page.</p>
               <textarea
@@ -1361,7 +1401,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'sessions' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="border-t-2 border-purple-100 bg-white p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-extrabold text-purple-900">Active Executive Sessions</h3>
                 <button onClick={loadExecSessions} className="text-xs text-purple-700 underline">Refresh</button>
@@ -1385,7 +1425,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'archives' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 max-h-72 overflow-auto">
+            <div className="border-t-2 border-purple-100 bg-white p-4 max-h-72 overflow-auto">
               <h3 className="text-sm font-extrabold text-purple-900 mb-2">Past Clearance Days</h3>
               {archiveDates.length === 0 ? (
                 <p className="text-xs text-purple-700">No archived sessions yet. Archives are created when you Reset Day.</p>
@@ -1444,7 +1484,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'duplicates' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4">
+            <div className="border-t-2 border-purple-100 bg-white p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-extrabold text-purple-900">Duplicate Detector</h3>
                 <button onClick={loadDuplicates} className="text-xs text-purple-700 underline">Refresh</button>
@@ -1468,7 +1508,7 @@ export default function Dashboard() {
           )}
 
           {superTab === 'venue' && (
-            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-4">
+            <div className="border-t-2 border-purple-100 bg-white p-4 space-y-4">
               <h3 className="text-sm font-extrabold text-purple-900">📍 Venue & Location Settings</h3>
 
               {/* Geofencing toggle */}
