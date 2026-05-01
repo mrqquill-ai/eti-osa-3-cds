@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Auth form input — shared across Login, Signup, ForgotPassword ── */
+@layer components {
+  .auth-input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm
+           text-slate-900 placeholder-slate-400 transition-all outline-none;
+  }
+
+  .auth-input:focus {
+    border-color: #1B6B3A;
+    box-shadow: 0 0 0 3px rgba(27, 107, 58, 0.12);
+  }
+
+  /* Error variant — apply .auth-input.auth-input--error */
+  .auth-input--error {
+    border-color: #F87171 !important;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12) !important;
+  }
+}
+
 html, body, #root {
   height: 100%;
 }
