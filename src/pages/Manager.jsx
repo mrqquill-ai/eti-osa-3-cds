@@ -1,9 +1,22 @@
 import { useEffect, useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeCanvas } from 'qrcode.react'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError, getDeviceId } from '../lib/supabase.js'
 
 export default function Manager() {
+  const navigate = useNavigate()
+
+  // Redirect to /login if no active session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) navigate('/login', { replace: true })
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!session) navigate('/login', { replace: true })
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
+
   const [fullName, setFullName] = useState('')
   const [stateCode, setStateCode] = useState('')
   const [busy, setBusy] = useState(false)

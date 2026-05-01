@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
   ChevronRight,
@@ -32,18 +33,15 @@ const SORTABLE = [
 
 export default function Dashboard() {
   // ── ALL hooks declared up front (React rules of hooks) ──
+  const navigate = useNavigate()
+  const [sessionChecked, setSessionChecked] = useState(false)   // true once auth check done
+  const [adminPin, setAdminPin] = useState('')
+  const [unlocked, setUnlocked] = useState(false)
+  const [role, setRole] = useState('executive')
+  const isSuperAdmin = role === 'super_admin'
+  // Legacy PIN state (kept for manual super-admin pin entry flow)
   const [pinInput, setPinInput] = useState('')
   const [pinError, setPinError] = useState('')
-  const [adminPin, setAdminPin] = useState(() => {
-    try { return sessionStorage.getItem('admin_pin') || '' } catch { return '' }
-  })
-  const [unlocked, setUnlocked] = useState(() => {
-    try { return sessionStorage.getItem('dashboard_unlocked') === 'yes' } catch { return false }
-  })
-  const [role, setRole] = useState(() => {
-    try { return sessionStorage.getItem('admin_role') || 'executive' } catch { return 'executive' }
-  })
-  const isSuperAdmin = role === 'super_admin'
 
   // Super admin modals
   const [showAddRegModal, setShowAddRegModal] = useState(false)
@@ -123,7 +121,38 @@ export default function Dashboard() {
   const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
   const [newBatchSize, setNewBatchSize] = useState(30)
 
-  // Session timeout: re-lock after 15 minutes of inactivity, warn at 13 min.
+  // ── Auth: check session on mount, redirect to /login if missing ──
+  useEffect(() => {
+    async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        navigate('/login', { replace: true })
+        return
+      }
+      // Derive role from user metadata (set during sign-up)
+      const meta = session.user?.user_metadata || {}
+      const detectedRole = meta.role === 'super_admin' ? 'super_admin' : 'executive'
+      setRole(detectedRole)
+
+      // Auto-fetch the exec PIN so all RPCs work without manual PIN entry
+      try {
+        const { data: execPin } = await supabase.rpc('get_exec_pin')
+        if (execPin) setAdminPin(execPin)
+      } catch { /* get_exec_pin migration not yet run — PIN stays empty */ }
+
+      setUnlocked(true)
+      setSessionChecked(true)
+    }
+    checkSession()
+
+    // Listen for sign-out and redirect
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) navigate('/login', { replace: true })
+    })
+    return () => subscription.unsubscribe()
+  }, [navigate])
+
+  // Session timeout: sign out after 15 minutes of inactivity, warn at 13 min.
   useEffect(() => {
     if (!unlocked) return
     function resetTimer() { lastActivityRef.current = Date.now(); setTimeoutWarning(false) }
@@ -132,11 +161,8 @@ export default function Dashboard() {
     const check = setInterval(() => {
       const idle = Date.now() - lastActivityRef.current
       if (idle > 15 * 60 * 1000) {
-        setUnlocked(false)
-        setAdminPin('')
-        setRole('executive')
+        supabase.auth.signOut()   // triggers onAuthStateChange → navigate to /login
         setTimeoutWarning(false)
-        try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin'); sessionStorage.removeItem('admin_role') } catch {}
       } else if (idle > 13 * 60 * 1000) {
         setTimeoutWarning(true)
       }
@@ -225,7 +251,7 @@ export default function Dashboard() {
       setUnlocked(false)
       setAdminPin('')
       setRole('executive')
-      try { sessionStorage.removeItem('dashboard_unlocked'); sessionStorage.removeItem('admin_pin'); sessionStorage.removeItem('admin_role') } catch {}
+      supabase.auth.signOut()
     } else if (raw.includes('dashboard_frozen')) {
       friendly = 'Dashboard is temporarily frozen by the super admin. Please wait.'
     } else if (raw.includes('register_corps_member') || raw.includes('reset_day') || raw.includes('function')) {
@@ -308,74 +334,6 @@ export default function Dashboard() {
   }
 
   // ── Actions (all use server-side PIN validation) ──────
-  async function handlePinSubmit(e) {
-    e.preventDefault()
-    const trimmed = pinInput.trim()
-    if (!trimmed) return
-
-    // Brute-force protection: lock after 5 failed attempts for 60 seconds
-    if (pinLockUntil > Date.now()) {
-      const secsLeft = Math.ceil((pinLockUntil - Date.now()) / 1000)
-      setPinError(`Too many attempts. Try again in ${secsLeft} seconds.`)
-      return
-    }
-
-    setBusy(true)
-    setPinError('')
-    try {
-      // Try the new verify_login first (returns role), fall back to verify_admin_pin
-      let detectedRole = null
-      const { data: roleData, error: roleErr } = await supabase.rpc('verify_login', { p_pin: trimmed })
-      if (!roleErr && roleData) {
-        detectedRole = roleData
-      } else {
-        // Fallback if migration not yet run
-        const { data: legacyData, error: legacyErr } = await supabase.rpc('verify_admin_pin', { p_pin: trimmed })
-        if (legacyErr) throw legacyErr
-        if (legacyData) detectedRole = 'executive'
-      }
-
-      if (detectedRole) {
-        setAdminPin(trimmed)
-        setRole(detectedRole)
-        setUnlocked(true)
-        setPinAttempts(0)
-        // Fetch pin_locked status
-        try {
-          const { data: lockData } = await supabase.rpc('get_pin_lock_status', { p_pin: trimmed })
-          if (typeof lockData === 'boolean') setPinLocked(lockData)
-        } catch {}
-        try {
-          sessionStorage.setItem('dashboard_unlocked', 'yes')
-          sessionStorage.setItem('admin_pin', trimmed)
-          sessionStorage.setItem('admin_role', detectedRole)
-        } catch {}
-      } else {
-        const attempts = pinAttempts + 1
-        setPinAttempts(attempts)
-        if (attempts >= 5) {
-          const lockTime = Date.now() + 60000 * Math.min(attempts - 4, 5) // 1-5 min escalating
-          setPinLockUntil(lockTime)
-          setPinError(`Too many wrong attempts. Locked for ${Math.ceil((lockTime - Date.now()) / 60000)} minute(s).`)
-        } else {
-          setPinError(`Wrong PIN. ${5 - attempts} attempt(s) remaining.`)
-        }
-        setPinInput('')
-      }
-    } catch (err) {
-      const msg = (err && err.message) || ''
-      if (msg.toLowerCase().includes('failed to fetch')) {
-        setPinError('No internet connection. Try again.')
-      } else if (msg.includes('verify_admin_pin') || msg.includes('does not exist')) {
-        setPinError('Security update needed. Ask the admin to run the latest SQL migration.')
-      } else {
-        setPinError('Could not verify PIN. Try again.')
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function startSession() {
     setBusy(true); setError('')
     try {
@@ -516,7 +474,7 @@ export default function Dashboard() {
       // If super admin changed exec PIN, don't update own PIN
       if (!isSuperAdmin) {
         setAdminPin(newPinInput)
-        try { sessionStorage.setItem('admin_pin', newPinInput) } catch {}
+        setAdminPin(newPinInput)
       }
       setShowChangePinModal(false)
       setNewPinInput('')
@@ -881,7 +839,7 @@ export default function Dashboard() {
       const { error: e } = await supabase.rpc('super_admin_change_pin', { p_current_super_pin: adminPin, p_new_super_pin: newSuperPin })
       if (e) throw e
       setAdminPin(newSuperPin)
-      try { sessionStorage.setItem('admin_pin', newSuperPin) } catch {}
+      setAdminPin(newSuperPin)
       flash('Super admin PIN changed.')
       setShowSuperPinModal(false); setNewSuperPin('')
     } catch (e) { showError(e) } finally { setBusy(false) }
@@ -895,39 +853,16 @@ export default function Dashboard() {
     })
   }
 
-  // ── PIN screen ────────────────────────────────────────
-  if (!unlocked) {
+  // ── Session loading / redirect guard ─────────────────────
+  if (!sessionChecked) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 max-w-xs w-full text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-emerald-100 rounded-full p-3">
-              <Lock className="w-8 h-8 text-emerald-800" />
-            </div>
-          </div>
-          <h1 className="text-xl font-extrabold text-slate-950">Dashboard locked</h1>
-          <p className="text-sm text-slate-600 mt-1">Enter your PIN to continue.</p>
-          <form onSubmit={handlePinSubmit} className="mt-5">
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pinInput}
-              onChange={(e) => { setPinInput(e.target.value); setPinError('') }}
-              placeholder="Enter PIN"
-              autoFocus
-              className="w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
-            />
-            {pinError && (
-              <div className="text-red-700 text-sm font-semibold mt-2">{pinError}</div>
-            )}
-            <button
-              type="submit"
-              disabled={!pinInput || busy}
-              className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl text-base transition-colors"
-            >
-              {busy ? 'Verifying...' : 'Unlock'}
-            </button>
-          </form>
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <svg className="w-8 h-8 animate-spin text-emerald-700" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          <span className="text-sm font-medium">Checking session…</span>
         </div>
       </div>
     )
@@ -1101,6 +1036,16 @@ export default function Dashboard() {
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors"
                 >
                   Reset day
+                </button>
+                <hr className="my-1 border-slate-200" />
+                <button
+                  onClick={async () => { setShowSettingsMenu(false); await supabase.auth.signOut() }}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                  </svg>
+                  Sign out
                 </button>
               </div>
             )}

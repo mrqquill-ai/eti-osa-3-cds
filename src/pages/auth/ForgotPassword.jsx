@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../../lib/supabase.js'
 
 const G = '#1B6B3A'
 
@@ -14,8 +15,10 @@ export default function ForgotPassword() {
     setError('')
     setLoading(true)
     try {
-      // TODO: wire up supabase.auth.resetPasswordForEmail(email, { redirectTo: '...' })
-      await new Promise(r => setTimeout(r, 900))
+      const { error: authErr } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      })
+      if (authErr) throw authErr
       setSent(true)
     } catch (err) {
       setError(err.message || 'Could not send reset link. Please try again.')

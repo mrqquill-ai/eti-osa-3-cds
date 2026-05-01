@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
+import { supabase } from '../../lib/supabase.js'
 
 const G    = '#1B6B3A'
 const GOLD = '#C9973A'
@@ -50,9 +51,18 @@ export default function Signup() {
 
     setLoading(true)
     try {
-      // TODO: wire up Supabase auth + store role/stateCode in profile table
-      // const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name, state_code, role } } })
-      await new Promise(r => setTimeout(r, 1000))
+      const { error: authErr } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name:  form.fullName,
+            state_code: form.stateCode,
+            role:       form.role,
+          }
+        }
+      })
+      if (authErr) throw authErr
       setSuccess(true)
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')

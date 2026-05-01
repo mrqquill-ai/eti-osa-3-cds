@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
+import { supabase } from '../../lib/supabase.js'
 
 const G = '#1B6B3A'
 
@@ -9,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPw,   setShowPw]   = useState(false)
   const [loading,  setLoading]  = useState(false)
+  const navigate = useNavigate()
   const [error,    setError]    = useState('')
 
   async function handleSubmit(e) {
@@ -16,11 +18,13 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      // TODO: replace with supabase.auth.signInWithPassword({ email, password })
-      await new Promise(r => setTimeout(r, 900))
-      // navigate('/dashboard')
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (authErr) throw authErr
+      navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(err.message || 'Invalid email or password. Please try again.')
+      setError(err.message === 'Invalid login credentials'
+        ? 'Invalid email or password. Please try again.'
+        : err.message || 'Sign in failed. Please try again.')
     } finally {
       setLoading(false)
     }

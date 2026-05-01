@@ -1,4 +1,6 @@
-import { Link, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase.js'
 
 /* ─── Brand constants ────────────────────────────────────────── */
 const G       = '#1B6B3A'   // NYSC green
@@ -321,6 +323,15 @@ function MobileTopBar() {
    AUTH LAYOUT — root export
    ───────────────────────────────────────────────────────────── */
 export default function AuthLayout() {
+  const navigate = useNavigate()
+
+  // Already logged in? Skip straight to the dashboard
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate('/dashboard', { replace: true })
+    })
+  }, [navigate])
+
   return (
     <div
       className="min-h-screen flex flex-col lg:flex-row"
