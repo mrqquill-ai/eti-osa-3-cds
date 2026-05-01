@@ -53,7 +53,7 @@ export default function App() {
       )}
 
       {/* ── Top header ── */}
-      <header className="bg-emerald-900 text-white shadow-md sticky top-0 z-40">
+      <header className="bg-emerald-700 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between gap-3" style={{ minHeight: '52px' }}>
 
           {/* Brand */}
@@ -61,7 +61,7 @@ export default function App() {
             to={isCorpsMemberPage ? '/join' : '/manager'}
             className="flex items-center gap-2 min-w-0"
           >
-            <div className="bg-emerald-700 rounded-lg p-1.5 flex-shrink-0">
+            <div className="bg-emerald-800 rounded-lg p-1.5 flex-shrink-0">
               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../../lib/supabase.js'
 
@@ -133,17 +133,10 @@ export default function Login() {
         </button>
       </form>
 
-      {/* Divider + signup nudge */}
+      {/* Contact admin note */}
       <div className="mt-7 pt-6 border-t border-slate-100 text-center">
         <p className="text-xs text-slate-400">
-          Need an account?{' '}
-          <Link
-            to="/signup"
-            className="font-semibold transition-colors hover:underline"
-            style={{ color: G }}
-          >
-            Request access
-          </Link>
+          Need access? Contact your CDS coordinator.
         </p>
       </div>
     </div>
