@@ -2,10 +2,10 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId, friendlyNetworkError } from '../lib/supabase.js'
 
-// Jamatul Islamiyya Primary School, 52 Baale St, Lekki Peninsula II
-const VENUE_LAT = 6.4360344
-const VENUE_LNG = 3.523451
-const RADIUS_METERS = 200
+// Default venue coords — overridden by session_settings from DB
+const DEFAULT_VENUE_LAT = 6.4360344
+const DEFAULT_VENUE_LNG = 3.523451
+const DEFAULT_RADIUS_METERS = 350
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000
@@ -69,16 +69,32 @@ export default function Join() {
   const [recheckingGeo, setRecheckingGeo] = useState(false)
   const retryCount = useRef(0)
 
-  // Poll registration status
+  // Live geo settings loaded from DB (overrides hardcoded defaults)
+  const [geoSettings, setGeoSettings] = useState({
+    geofencing_enabled: true,
+    venue_lat: DEFAULT_VENUE_LAT,
+    venue_lng: DEFAULT_VENUE_LNG,
+    venue_radius_m: DEFAULT_RADIUS_METERS,
+  })
+
+  // Poll registration status + geo settings
   useEffect(() => {
     async function check() {
       try {
         const { data } = await supabase
           .from('session_settings')
-          .select('registration_open')
+          .select('registration_open, geofencing_enabled, venue_lat, venue_lng, venue_radius_m')
           .eq('id', 1)
           .single()
-        if (data) setRegistrationOpen(data.registration_open)
+        if (data) {
+          setRegistrationOpen(data.registration_open)
+          setGeoSettings({
+            geofencing_enabled: data.geofencing_enabled ?? true,
+            venue_lat:          data.venue_lat          ?? DEFAULT_VENUE_LAT,
+            venue_lng:          data.venue_lng          ?? DEFAULT_VENUE_LNG,
+            venue_radius_m:     data.venue_radius_m     ?? DEFAULT_RADIUS_METERS,
+          })
+        }
       } catch {}
     }
     check()
@@ -86,8 +102,15 @@ export default function Join() {
     return () => clearInterval(interval)
   }, [])
 
-  // Geolocation check function (reusable for recheck)
+  // Geolocation check — uses live settings from DB
   const checkLocation = useCallback(() => {
+    // If geofencing is disabled by super admin, always allow
+    if (!geoSettings.geofencing_enabled) {
+      setGeoState('allowed')
+      setRecheckingGeo(false)
+      return
+    }
+
     if (!navigator.geolocation) {
       setGeoState('error')
       return
@@ -101,9 +124,9 @@ export default function Join() {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
         setUserCoords({ lat, lng })
-        const dist = haversineDistance(lat, lng, VENUE_LAT, VENUE_LNG)
+        const dist = haversineDistance(lat, lng, geoSettings.venue_lat, geoSettings.venue_lng)
         setDistance(Math.round(dist))
-        setGeoState(dist <= RADIUS_METERS ? 'allowed' : 'too_far')
+        setGeoState(dist <= geoSettings.venue_radius_m ? 'allowed' : 'too_far')
         setRecheckingGeo(false)
       },
       (err) => {
@@ -116,9 +139,9 @@ export default function Join() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
-  }, [])
+  }, [geoSettings])
 
-  // Check geolocation on mount
+  // Re-run location check whenever geo settings change (e.g. super admin disables geo)
   useEffect(() => { checkLocation() }, [checkLocation])
 
   // Lookup existing registration

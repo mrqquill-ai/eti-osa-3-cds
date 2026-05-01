@@ -60,7 +60,7 @@ export default function Dashboard() {
   const [forceExecPin, setForceExecPin] = useState('')
 
   // Super admin panel
-  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'log','stats','announce','sessions','archives','duplicates'
+  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'log','stats','announce','sessions','archives','duplicates','venue'
   const [activityLog, setActivityLog] = useState([])
   const [logLoading, setLogLoading] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -69,6 +69,12 @@ export default function Dashboard() {
   const [archiveRows, setArchiveRows] = useState([])
   const [archiveDate, setArchiveDate] = useState(null)
   const [duplicates, setDuplicates] = useState([])
+  // Venue / geo settings
+  const [venueGeoEnabled, setVenueGeoEnabled] = useState(true)
+  const [venueLat, setVenueLat] = useState('6.4360344')
+  const [venueLng, setVenueLng] = useState('3.523451')
+  const [venueRadius, setVenueRadius] = useState('350')
+  const [venueSuccess, setVenueSuccess] = useState('')
   const [showMoveWaveModal, setShowMoveWaveModal] = useState(null)
   const [targetWave, setTargetWave] = useState(1)
   const [showNoteModal, setShowNoteModal] = useState(null)
@@ -820,7 +826,53 @@ export default function Dashboard() {
     if (superTab === 'archives') loadArchiveDates()
     if (superTab === 'duplicates') loadDuplicates()
     if (superTab === 'announce' && settings) setAnnouncement(settings.announcement || '')
+    if (superTab === 'venue' && settings) {
+      setVenueGeoEnabled(settings.geofencing_enabled ?? true)
+      setVenueLat(String(settings.venue_lat ?? '6.4360344'))
+      setVenueLng(String(settings.venue_lng ?? '3.523451'))
+      setVenueRadius(String(settings.venue_radius_m ?? '350'))
+    }
   }, [superTab])
+
+  // Save venue / geofencing settings (super admin)
+  async function saveVenueSettings() {
+    const lat = parseFloat(venueLat)
+    const lng = parseFloat(venueLng)
+    const radius = parseInt(venueRadius, 10)
+    if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius < 50) {
+      showError({ message: 'Invalid coordinates or radius (minimum 50m).' }); return
+    }
+    setBusy(true); setVenueSuccess('')
+    try {
+      const { error: e } = await supabase.rpc('super_admin_update_geo_settings', {
+        p_super_pin:          adminPin,
+        p_geofencing_enabled: venueGeoEnabled,
+        p_venue_lat:          lat,
+        p_venue_lng:          lng,
+        p_venue_radius_m:     radius,
+      })
+      if (e) throw e
+      setVenueSuccess('Venue settings saved!')
+      // Update local settings cache
+      setSettings(prev => prev ? { ...prev, geofencing_enabled: venueGeoEnabled, venue_lat: lat, venue_lng: lng, venue_radius_m: radius } : prev)
+      setTimeout(() => setVenueSuccess(''), 3000)
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
+
+  // Toggle geofencing on/off (executive + super admin)
+  async function toggleGeofencing() {
+    setBusy(true)
+    try {
+      const newVal = !(settings?.geofencing_enabled ?? true)
+      const { error: e } = await supabase
+        .from('session_settings')
+        .update({ geofencing_enabled: newVal })
+        .eq('id', 1)
+      if (e) throw e
+      setSettings(prev => prev ? { ...prev, geofencing_enabled: newVal } : prev)
+      flash(newVal ? 'Geofencing enabled.' : 'Geofencing disabled — corps members can join from any location.')
+    } catch (e) { showError(e) } finally { setBusy(false) }
+  }
 
   async function superChangeSuperPin() {
     if (newSuperPin.length < 6) { setError('Super admin PIN must be at least 6 characters.'); return }
@@ -970,6 +1022,16 @@ export default function Dashboard() {
                   className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-white transition-colors"
                 >
                   {settings?.registration_open ? 'Close registration' : 'Open registration'}
+                </button>
+                <button
+                  onClick={() => { toggleGeofencing(); setShowSettingsMenu(false) }}
+                  disabled={busy || !settings}
+                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors flex items-center gap-2"
+                >
+                  {settings?.geofencing_enabled ?? true
+                    ? <><span>📍</span> Disable location check</>
+                    : <><span>📍</span> Enable location check</>
+                  }
                 </button>
                 <button
                   onClick={() => { setShowStartModal(true); setShowSettingsMenu(false) }}
@@ -1126,6 +1188,7 @@ export default function Dashboard() {
               { key: 'sessions', label: 'Exec Sessions' },
               { key: 'archives', label: 'Archives' },
               { key: 'duplicates', label: 'Duplicates' },
+              { key: 'venue', label: '📍 Venue & Location' },
             ].map(t => (
               <button
                 key={t.key}
@@ -1401,6 +1464,90 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {superTab === 'venue' && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-4">
+              <h3 className="text-sm font-extrabold text-purple-900">📍 Venue & Location Settings</h3>
+
+              {/* Geofencing toggle */}
+              <div className="bg-white rounded-xl border border-purple-200 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">Location check (geofencing)</div>
+                    <div className="text-xs text-slate-500 mt-0.5">When OFF, corps members can join from anywhere — useful when GPS is unreliable.</div>
+                  </div>
+                  <button
+                    onClick={() => setVenueGeoEnabled(v => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${venueGeoEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${venueGeoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Venue coordinates */}
+              <div className={`space-y-3 ${!venueGeoEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div>
+                  <label className="text-xs font-bold text-purple-900 block mb-1">Venue Latitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={venueLat}
+                    onChange={e => setVenueLat(e.target.value)}
+                    placeholder="e.g. 6.4360344"
+                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-purple-900 block mb-1">Venue Longitude</label>
+                  <input
+                    type="number"
+                    step="0.000001"
+                    value={venueLng}
+                    onChange={e => setVenueLng(e.target.value)}
+                    placeholder="e.g. 3.523451"
+                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-purple-900 block mb-1">
+                    Allowed radius (meters)
+                    <span className="ml-1 text-purple-500 font-normal">— how far from venue coords a phone can be</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="2000"
+                    value={venueRadius}
+                    onChange={e => setVenueRadius(e.target.value)}
+                    placeholder="350"
+                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
+                  />
+                  <p className="text-xs text-purple-600 mt-1">
+                    💡 <strong>Tip:</strong> If corps members are getting rejected despite being at the venue, increase this to 400–500m to account for GPS inaccuracy.
+                  </p>
+                </div>
+              </div>
+
+              {/* How to get coordinates */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                <strong>How to get your venue coordinates:</strong> Open Google Maps, long-press on the exact venue location, and copy the numbers that appear at the bottom (e.g. 6.436034, 3.523451).
+              </div>
+
+              {venueSuccess && (
+                <div className="bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg px-3 py-2 text-sm font-bold">
+                  ✅ {venueSuccess}
+                </div>
+              )}
+              <button
+                onClick={saveVenueSettings}
+                disabled={busy}
+                className="w-full py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold text-sm transition-colors"
+              >
+                {busy ? 'Saving...' : 'Save venue settings'}
+              </button>
             </div>
           )}
         </div>
