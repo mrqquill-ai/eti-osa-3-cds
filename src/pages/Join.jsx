@@ -69,15 +69,16 @@ export default function Join() {
   const [recheckingGeo, setRecheckingGeo] = useState(false)
   const retryCount = useRef(0)
 
-  // Live geo settings loaded from DB (overrides hardcoded defaults)
-  const [geoSettings, setGeoSettings] = useState({
+  // Use a ref so checkLocation always reads the LATEST settings synchronously
+  // (avoids stale closure bug where React state hasn't updated yet when called)
+  const geoSettingsRef = useRef({
     geofencing_enabled: true,
     venue_lat: DEFAULT_VENUE_LAT,
     venue_lng: DEFAULT_VENUE_LNG,
     venue_radius_m: DEFAULT_RADIUS_METERS,
   })
 
-  // Fetch latest settings from DB (used on mount, polling, and manual recheck)
+  // Fetch latest settings from DB — updates ref immediately, state for re-render
   const fetchSettings = useCallback(async () => {
     try {
       const { data } = await supabase
@@ -87,29 +88,31 @@ export default function Join() {
         .single()
       if (data) {
         setRegistrationOpen(data.registration_open)
-        setGeoSettings({
+        // Update ref FIRST so checkLocation() called right after gets fresh data
+        geoSettingsRef.current = {
           geofencing_enabled: data.geofencing_enabled ?? true,
           venue_lat:          data.venue_lat          ?? DEFAULT_VENUE_LAT,
           venue_lng:          data.venue_lng          ?? DEFAULT_VENUE_LNG,
           venue_radius_m:     data.venue_radius_m     ?? DEFAULT_RADIUS_METERS,
-        })
+        }
         return data
       }
     } catch {}
     return null
   }, [])
 
-  // Poll registration status + geo settings every 30s
+  // Poll every 30s
   useEffect(() => {
     fetchSettings()
     const interval = setInterval(fetchSettings, 30000)
     return () => clearInterval(interval)
   }, [fetchSettings])
 
-  // Geolocation check — uses live settings from DB
+  // Geolocation check — reads from ref so always has the latest venue coords
   const checkLocation = useCallback(() => {
-    // If geofencing is disabled by super admin, always allow
-    if (!geoSettings.geofencing_enabled) {
+    const gs = geoSettingsRef.current
+    // If geofencing is disabled, always allow
+    if (!gs.geofencing_enabled) {
       setGeoState('allowed')
       setRecheckingGeo(false)
       return
@@ -128,9 +131,9 @@ export default function Join() {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
         setUserCoords({ lat, lng })
-        const dist = haversineDistance(lat, lng, geoSettings.venue_lat, geoSettings.venue_lng)
+        const dist = haversineDistance(lat, lng, gs.venue_lat, gs.venue_lng)
         setDistance(Math.round(dist))
-        setGeoState(dist <= geoSettings.venue_radius_m ? 'allowed' : 'too_far')
+        setGeoState(dist <= gs.venue_radius_m ? 'allowed' : 'too_far')
         setRecheckingGeo(false)
       },
       (err) => {
@@ -143,9 +146,9 @@ export default function Join() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
-  }, [geoSettings])
+  }, []) // no deps — reads from ref, always fresh
 
-  // Re-run location check whenever geo settings change (e.g. super admin disables geo)
+  // Run location check on mount (after initial fetchSettings populates the ref)
   useEffect(() => { checkLocation() }, [checkLocation])
 
   // Lookup existing registration
@@ -371,7 +374,10 @@ export default function Join() {
           </p>
         )}
         <button
-          onClick={async () => { await fetchSettings(); checkLocation() }}
+          onClick={async () => {
+            await fetchSettings()   // updates geoSettingsRef.current with latest DB values
+            checkLocation()         // reads from ref — guaranteed to have fresh venue coords
+          }}
           disabled={recheckingGeo}
           className="mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-xl"
         >
