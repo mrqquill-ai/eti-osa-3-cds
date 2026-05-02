@@ -13,6 +13,7 @@ import {
   Lock,
   Download,
   Shield,
+  ShieldCheck,
   Plus,
   Pencil,
   Trash2,
@@ -120,6 +121,8 @@ export default function Dashboard() {
   const [pinLockUntil, setPinLockUntil] = useState(0)
   const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
   const [newBatchSize, setNewBatchSize] = useState(30)
+  const [dashTab, setDashTab] = useState('live')
+  const [expandedRow, setExpandedRow] = useState(null)
 
   // ── Auth: check session on mount, redirect to /login if missing ──
   useEffect(() => {
@@ -868,889 +871,325 @@ export default function Dashboard() {
     )
   }
 
-  // ── Main dashboard ────────────────────────────────────
+  // ── Main dashboard ─────────────────────────────────────────
   return (
-    <div className={`max-w-5xl mx-auto p-3 sm:p-5 flex flex-col ${darkMode ? 'dark-dashboard' : ''}`} style={{ height: 'calc(100vh - 40px)' }}>
-      {/* Error banner */}
+    <div className="max-w-2xl mx-auto px-4 py-4">
+
+      {/* ── Error banner ── */}
       {error && (
-        <div className="mb-3 bg-red-100 border-2 border-red-500 text-red-950 rounded-xl p-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-          <div className="flex-1">
-            <div className="font-extrabold text-sm">Something went wrong</div>
-            <div className="text-sm mt-0.5 whitespace-pre-wrap">{error}</div>
+        <div className="mb-3 rounded-xl p-3 flex items-start gap-3" style={{ backgroundColor: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.3)' }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#C0392B' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold" style={{ color: '#C0392B' }}>Something went wrong</div>
+            <div className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: '#C0392B' }}>{error}</div>
           </div>
-          <button onClick={() => setError('')} className="text-red-900 font-bold text-lg leading-none px-1" aria-label="Dismiss">
-            <X className="w-4 h-4" />
+          <button onClick={() => setError('')} aria-label="Dismiss">
+            <X className="w-4 h-4" style={{ color: '#C0392B' }} />
           </button>
         </div>
       )}
 
-      {/* Timeout warning */}
+      {/* ── Timeout warning ── */}
       {timeoutWarning && (
-        <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2 animate-pulse">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          Session will lock in ~2 minutes due to inactivity. Tap anywhere to stay logged in.
+        <div className="mb-3 rounded-xl p-3 flex items-center gap-2 animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
+          <span className="text-sm font-semibold" style={{ color: '#92640A' }}>Session will lock in ~2 minutes. Tap anywhere to stay logged in.</span>
         </div>
       )}
 
-      {/* Default PIN warning */}
+      {/* ── Default PIN warning ── */}
       {adminPin === '2025' && (
-        <div className="mb-3 bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          You are using the default executive PIN. Change it under Settings {'\u2192'} Change executive PIN.
-        </div>
-      )}
-      {isSuperAdmin && adminPin === 'SUPERADMIN2025' && (
-        <div className="mb-3 bg-purple-100 border-2 border-purple-400 text-purple-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
-          <Shield className="w-4 h-4 flex-shrink-0" />
-          You are using the default super admin PIN. Change it under Settings {'\u2192'} Change super admin PIN.
+        <div className="mb-3 rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
+          <span className="text-sm font-semibold" style={{ color: '#92640A' }}>You are using the default executive PIN. Change it in Settings.</span>
         </div>
       )}
 
-      {/* ── Top bar: title + role badge + settings overflow ── */}
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold text-slate-950">Dashboard</h1>
-            {isSuperAdmin && (
-              <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                <Shield className="w-3 h-3" /> Super Admin
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-600 font-medium">Eti-Osa 3 Special CDS</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isSuperAdmin && (
-            <button
-              onClick={() => { setShowAddRegModal(true); setAddRegName(''); setAddRegCode(''); setError('') }}
-              className="flex items-center gap-1.5 bg-purple-700 hover:bg-purple-800 active:bg-purple-900 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors"
-              aria-label="Add registration"
-            >
-              <Plus className="w-4 h-4" />
-              Add
-            </button>
-          )}
-          {!sessionActive && (
-            <button
-              onClick={() => setShowStartModal(true)}
-              className="flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 active:bg-emerald-950 text-white font-bold px-3 py-2 rounded-lg text-sm transition-colors"
-            >
-              <PlayCircle className="w-4 h-4" />
-              Start session
-            </button>
-          )}
-
-          <div className="relative" ref={settingsRef}>
-            <button
-              onClick={() => setShowSettingsMenu((p) => !p)}
-              className="p-2 rounded-lg hover:bg-slate-200 active:bg-slate-300 text-slate-700 transition-colors"
-              aria-label="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-            {showSettingsMenu && (
-              <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-40">
-                <button
-                  onClick={toggleRegistration}
-                  disabled={busy || !settings}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-white transition-colors"
-                >
-                  {settings?.registration_open ? 'Close registration' : 'Open registration'}
-                </button>
-                <button
-                  onClick={() => { toggleGeofencing(); setShowSettingsMenu(false) }}
-                  disabled={busy || !settings}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors flex items-center gap-2"
-                >
-                  {settings?.geofencing_enabled ?? true
-                    ? <><span>📍</span> Disable location check</>
-                    : <><span>📍</span> Enable location check</>
-                  }
-                </button>
-                <button
-                  onClick={() => { setShowStartModal(true); setShowSettingsMenu(false) }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  Start new session
-                </button>
-                <button
-                  onClick={() => { setShowChangeBatchSize(true); setNewBatchSize(settings?.batch_size ?? 30); setShowSettingsMenu(false) }}
-                  disabled={!settings}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors"
-                >
-                  Change wave size
-                </button>
-                {/* Executive PIN change — hidden if locked and not super admin */}
-                {(isSuperAdmin || !pinLocked) && (
-                  <button
-                    onClick={() => { setShowChangePinModal(true); setShowSettingsMenu(false) }}
-                    className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
-                  >
-                    Change executive PIN
-                  </button>
-                )}
-                <button
-                  onClick={() => { exportCSV(); setShowSettingsMenu(false) }}
-                  disabled={rows.length === 0}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:text-slate-400 transition-colors flex items-center gap-2"
-                >
-                  <Download className="w-3.5 h-3.5" /> Export CSV
-                </button>
-                {/* Super admin only settings */}
-                {isSuperAdmin && (
-                  <>
-                    <hr className="my-1 border-purple-200" />
-                    <div className="px-4 py-1 text-[10px] uppercase tracking-wider font-bold text-purple-600">Super Admin</div>
-                    <button
-                      onClick={() => { setShowAddRegModal(true); setAddRegName(''); setAddRegCode(''); setError(''); setShowSettingsMenu(false) }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add registration
-                    </button>
-                    <button
-                      onClick={() => { setShowForceExecPinModal(true); setForceExecPin(''); setShowSettingsMenu(false) }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                    >
-                      <LockKeyhole className="w-3.5 h-3.5" /> Set executive PIN
-                    </button>
-                    <button
-                      onClick={superTogglePinLock}
-                      disabled={busy}
-                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                    >
-                      {pinLocked ? <Unlock className="w-3.5 h-3.5" /> : <LockKeyhole className="w-3.5 h-3.5" />}
-                      {pinLocked ? 'Unlock exec PIN changes' : 'Lock exec PIN changes'}
-                    </button>
-                    <button
-                      onClick={() => { setShowSuperPinModal(true); setNewSuperPin(''); setShowSettingsMenu(false) }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                    >
-                      <Shield className="w-3.5 h-3.5" /> Change super admin PIN
-                    </button>
-                  </>
-                )}
-                <hr className="my-1 border-slate-200" />
-                <button
-                  onClick={() => { setShowResetConfirm(true); setShowSettingsMenu(false) }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors"
-                >
-                  Reset day
-                </button>
-                <hr className="my-1 border-slate-200" />
-                <button
-                  onClick={async () => { setShowSettingsMenu(false); await supabase.auth.signOut() }}
-                  className="w-full text-left px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                  </svg>
-                  Sign out
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* ── Heading ── */}
+      <div className="flex items-center gap-2 mb-4">
+        <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>Dashboard</h1>
+        {isSuperAdmin && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
+            <ShieldCheck className="w-3 h-3" /> Super Admin
+          </span>
+        )}
       </div>
 
-      {/* ── Config strip ── */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <span className="inline-flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
-          <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          Wave: <strong className="text-slate-900">{settings?.batch_size ?? '-'}</strong>
+      {/* ── Status chips ── */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-4 pb-0.5">
+        <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#1A1A1A' }}>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F59B0A' }} />
+          Wave {settings?.batch_size ?? '—'}
         </span>
-        <span className={`inline-flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm ${
-          settings?.registration_open
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-            : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${settings?.registration_open ? 'bg-emerald-500' : 'bg-red-500'}`}/>
-          {settings?.registration_open ? 'Registration open' : 'Registration closed'}
+        <span
+          className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
+          style={{ border: '1px solid #E0DDD6', color: settings?.registration_open ? '#1B6B3A' : '#8C8880' }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: settings?.registration_open ? '#1B6B3A' : '#8C8880' }} />
+          {settings?.registration_open ? 'Reg. open' : 'Reg. closed'}
         </span>
-        {/* Geofencing toggle — visible to ALL (exec + super admin) */}
         <button
           onClick={toggleGeofencing}
           disabled={busy || !settings}
-          title="Toggle location check on/off"
-          className={`inline-flex items-center gap-1.5 border rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 ${
-            (settings?.geofencing_enabled ?? true)
-              ? 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
-              : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
-          }`}
+          className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white transition-opacity disabled:opacity-50"
+          style={{ border: '1px solid #E0DDD6', color: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#8C8880' }}
         >
-          <span>📍</span>
-          {(settings?.geofencing_enabled ?? true) ? 'Location: ON' : 'Location: OFF'}
-          <span className={`w-1.5 h-1.5 rounded-full ml-0.5 ${(settings?.geofencing_enabled ?? true) ? 'bg-blue-500' : 'bg-amber-500'}`}/>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#8C8880' }} />
+          Location: {(settings?.geofencing_enabled ?? true) ? 'ON' : 'OFF'}
         </button>
       </div>
 
-      {/* ── Hero: Call next wave + Go back ── */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={handleCallNextBatch}
-          disabled={busy || !settings}
-          title={nextBatchCount === 0 ? 'No corps members in the next wave yet' : `Call wave ${nextBatchNumber} (${nextBatchCount} corps members)`}
-          className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-extrabold px-8 py-4 rounded-xl text-lg shadow-lg shadow-emerald-900/20 transition-colors"
-        >
-          <ChevronRight className="w-6 h-6" />
-          Call next wave
-          {settings?.current_batch > 0 && (
-            <span className="ml-1 bg-white/20 rounded-md px-2 py-0.5 text-sm font-bold">
-              &rarr; {nextBatchNumber}
-            </span>
-          )}
-        </button>
-        {settings?.current_batch > 0 && (
-          <button
-            onClick={goBackBatch}
-            disabled={busy}
-            title={`Go back to wave ${(settings?.current_batch ?? 1) - 1}`}
-            className="flex items-center gap-1.5 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:bg-slate-100 disabled:cursor-not-allowed text-slate-800 font-bold px-4 py-4 rounded-xl text-sm transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-            Go back
-          </button>
-        )}
-      </div>
-      <div className="mb-4 -mt-2">
-        {nextBatchCount === 0 && settings?.current_batch >= 0 && (
-          <p className="text-xs text-slate-500 pl-1">No corps members in wave {nextBatchNumber} yet.</p>
-        )}
-      </div>
-
-      {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <Stat
-          label="Now serving"
-          value={settings?.current_batch ? `Wave ${settings.current_batch}` : 'None'}
-          subtitle={currentWaveProgress ? `${currentWaveProgress.served}/${currentWaveProgress.total} served` : null}
-          accent
-        />
-        <Stat label="Registered" value={counts.registered} />
-        <Stat label="Waiting" value={counts.waiting} />
-        <Stat label="Served" value={counts.served} />
-      </div>
-
-      {/* Frozen banner for executives */}
+      {/* ── Frozen banner ── */}
       {!isSuperAdmin && settings?.exec_frozen && (
-        <div className="mb-3 bg-blue-100 border-2 border-blue-400 text-blue-900 rounded-xl p-3 text-sm font-semibold flex items-center gap-2">
-          <Lock className="w-4 h-4 flex-shrink-0" />
-          Dashboard actions are temporarily frozen by the super admin. You can view data but cannot make changes.
+        <div className="mb-3 rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: 'rgba(27,107,58,0.06)', border: '1px solid rgba(27,107,58,0.2)' }}>
+          <Lock className="w-4 h-4 flex-shrink-0" style={{ color: '#1B6B3A' }} />
+          <span className="text-sm font-semibold" style={{ color: '#1B6B3A' }}>Actions are frozen by the super admin.</span>
         </div>
       )}
 
-      {/* ── Super Admin Panel ── */}
-      {isSuperAdmin && (
-        <div className="mb-4 rounded-2xl overflow-hidden border-2 border-purple-200 shadow-sm">
+      {/* ── Call Next Wave ── */}
+      <button
+        onClick={handleCallNextBatch}
+        disabled={busy || !settings}
+        className="w-full flex items-center justify-center gap-2 mb-4 py-4 rounded-xl text-white font-bold text-base transition-opacity active:opacity-80 disabled:opacity-40"
+        style={{ backgroundColor: '#1B6B3A' }}
+      >
+        <ChevronRight className="w-5 h-5" />
+        Call Next Wave
+        {settings?.current_batch >= 0 && (
+          <span className="font-extrabold">&rarr; {nextBatchNumber}</span>
+        )}
+        {nextBatchCount > 0 && (
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+            {nextBatchCount}
+          </span>
+        )}
+      </button>
 
-          {/* ── Panel header ── */}
-          <div className="flex items-center justify-between px-4 py-3 bg-purple-700">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-purple-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              <span className="text-white font-extrabold text-sm tracking-wide">Super Admin Controls</span>
-            </div>
-            {/* Utility icon buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={toggleFreeze}
-                disabled={busy}
-                title={settings?.exec_frozen ? 'Unfreeze executives' : 'Freeze all executive actions'}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base transition-colors ${
-                  settings?.exec_frozen
-                    ? 'bg-red-500 text-white hover:bg-red-400'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-              >
-                {settings?.exec_frozen ? '\uD83D\uDD13' : '\uD83D\uDD12'}
-              </button>
-              <button
-                onClick={() => { setDarkMode(d => { const v = !d; try { localStorage.setItem('dashboard_dark', v ? 'yes' : '') } catch {}; return v }); }}
-                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/10 text-white hover:bg-white/20 transition-colors"
-              >
-                {darkMode ? '\u2600\uFE0F' : '\uD83C\uDF19'}
-              </button>
-              <button
-                onClick={startQRScan}
-                title="Scan QR code"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/10 text-white hover:bg-white/20 transition-colors"
-              >
-                {'\uD83D\uDCF7'}
-              </button>
-              <button
-                onClick={() => setSoundEnabled(s => !s)}
-                title={soundEnabled ? 'Mute notification sounds' : 'Enable notification sounds'}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center text-base transition-colors ${
-                  soundEnabled ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-              >
-                {soundEnabled ? '\uD83D\uDD14' : '\uD83D\uDD15'}
-              </button>
-            </div>
-          </div>
-
-          {/* ── Feature card grid ── */}
-          <div className="bg-purple-50 p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { key: 'log',        icon: '\uD83D\uDCCB', label: 'Activity Log',  desc: 'Full audit trail' },
-              { key: 'stats',      icon: '\uD83D\uDCCA', label: 'Live Stats',    desc: 'Analytics & charts' },
-              { key: 'announce',   icon: '\uD83D\uDCE2', label: 'Announce',      desc: 'Broadcast to members' },
-              { key: 'sessions',   icon: '\uD83D\uDC65', label: 'Sessions',      desc: "Who's online" },
-              { key: 'archives',   icon: '\uD83D\uDDC4\uFE0F', label: 'Archives', desc: 'Past session data' },
-              { key: 'duplicates', icon: '\uD83D\uDD0D', label: 'Duplicates',    desc: 'Flag repeat entries' },
-              { key: 'venue',      icon: '\uD83D\uDCCD', label: 'Venue & GPS',   desc: 'Geofencing settings' },
-            ].map(t => (
-              <button
-                key={t.key}
-                onClick={() => setSuperTab(superTab === t.key ? null : t.key)}
-                className={`flex items-center gap-2.5 p-3 rounded-xl text-left transition-all border-2 ${
-                  superTab === t.key
-                    ? 'bg-purple-700 border-purple-700 text-white shadow-md'
-                    : 'bg-white border-transparent hover:border-purple-200 text-slate-800 shadow-sm hover:shadow'
-                }`}
-              >
-                <span className="text-xl leading-none flex-shrink-0">{t.icon}</span>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold leading-tight">{t.label}</div>
-                  <div className={`text-[10px] leading-tight mt-0.5 ${superTab === t.key ? 'text-purple-200' : 'text-slate-400'}`}>{t.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Panel content */}
-          {superTab === 'log' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4 max-h-64 overflow-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-extrabold text-purple-900">Activity Log</h3>
-                <button onClick={loadActivityLog} className="text-xs text-purple-700 underline">{logLoading ? 'Loading...' : 'Refresh'}</button>
-              </div>
-              {activityLog.length === 0 ? (
-                <p className="text-xs text-purple-700">No activity recorded yet.</p>
-              ) : (
-                <div className="space-y-1">
-                  {activityLog.map(a => (
-                    <div key={a.id} className="flex items-start gap-2 text-xs">
-                      <span className="text-purple-500 whitespace-nowrap">{new Date(a.created_at).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${a.role === 'super_admin' ? 'bg-purple-200 text-purple-800' : 'bg-slate-200 text-slate-700'}`}>{a.role === 'super_admin' ? 'SA' : 'Exec'}</span>
-                      <span className="font-semibold text-slate-900">{a.action.replace(/_/g, ' ')}</span>
-                      {a.details && <span className="text-slate-600 truncate">{'\u2014'} {a.details}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {superTab === 'stats' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4">
-              <h3 className="text-sm font-extrabold text-purple-900 mb-3">Live Stats</h3>
-              {(() => {
-                const now = new Date()
-                const activeRows = rows.filter(r => !r.voided)
-                const servedRows = activeRows.filter(r => r.served_at)
-                // Registrations per hour
-                const hourBuckets = {}
-                activeRows.forEach(r => {
-                  const h = new Date(r.registered_at).getHours()
-                  hourBuckets[h] = (hourBuckets[h] || 0) + 1
-                })
-                const peakHour = Object.entries(hourBuckets).sort((a, b) => b[1] - a[1])[0]
-                // Average serve time
-                const serveTimes = servedRows.map(r => new Date(r.served_at) - new Date(r.registered_at)).filter(t => t > 0)
-                const avgServeMs = serveTimes.length ? serveTimes.reduce((a, b) => a + b, 0) / serveTimes.length : 0
-                const avgServeMins = Math.round(avgServeMs / 60000)
-                // Peak wave
-                const waveCounts = {}
-                activeRows.forEach(r => { waveCounts[r.batch_number] = (waveCounts[r.batch_number] || 0) + 1 })
-                const peakWave = Object.entries(waveCounts).sort((a, b) => b[1] - a[1])[0]
-                // Serve rate
-                const serveRate = activeRows.length ? Math.round((servedRows.length / activeRows.length) * 100) : 0
-
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase font-bold text-purple-600">Avg Clear Time</div>
-                      <div className="text-xl font-extrabold text-slate-900">{avgServeMins ? `${avgServeMins}m` : '--'}</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase font-bold text-purple-600">Serve Rate</div>
-                      <div className="text-xl font-extrabold text-slate-900">{serveRate}%</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase font-bold text-purple-600">Peak Hour</div>
-                      <div className="text-xl font-extrabold text-slate-900">{peakHour ? `${peakHour[0]}:00` : '--'}</div>
-                      <div className="text-[10px] text-slate-500">{peakHour ? `${peakHour[1]} people` : ''}</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 text-center">
-                      <div className="text-[10px] uppercase font-bold text-purple-600">Busiest Wave</div>
-                      <div className="text-xl font-extrabold text-slate-900">{peakWave ? `Wave ${peakWave[0]}` : '--'}</div>
-                      <div className="text-[10px] text-slate-500">{peakWave ? `${peakWave[1]} people` : ''}</div>
-                    </div>
-                  </div>
-                )
-              })()}
-              {/* Hourly breakdown */}
-              <div className="mt-3">
-                <div className="text-[10px] uppercase font-bold text-purple-600 mb-1">Registrations by Hour</div>
-                <div className="flex items-end gap-1 h-16">
-                  {(() => {
-                    const activeRows = rows.filter(r => !r.voided)
-                    const buckets = {}
-                    activeRows.forEach(r => { const h = new Date(r.registered_at).getHours(); buckets[h] = (buckets[h] || 0) + 1 })
-                    const maxCount = Math.max(1, ...Object.values(buckets))
-                    const hours = []
-                    for (let h = 7; h <= 18; h++) hours.push(h)
-                    return hours.map(h => (
-                      <div key={h} className="flex-1 flex flex-col items-center gap-0.5">
-                        <div
-                          className="w-full bg-purple-400 rounded-t"
-                          style={{ height: `${Math.max(2, ((buckets[h] || 0) / maxCount) * 100)}%` }}
-                          title={`${h}:00 - ${buckets[h] || 0} registrations`}
-                        />
-                        <span className="text-[8px] text-slate-500">{h}</span>
-                      </div>
-                    ))
-                  })()}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {superTab === 'announce' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4">
-              <h3 className="text-sm font-extrabold text-purple-900 mb-2">Announcement</h3>
-              <p className="text-xs text-purple-700 mb-2">This message appears on every corps member's status page.</p>
-              <textarea
-                value={announcement}
-                onChange={e => setAnnouncement(e.target.value)}
-                maxLength={300}
-                rows={2}
-                placeholder="e.g. Break time: 1pm-2pm. Clearance resumes at 2pm."
-                className="w-full rounded-lg border-2 border-purple-300 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm"
-              />
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-[10px] text-purple-500">{announcement.length}/300</span>
-                <div className="flex gap-2">
-                  {settings?.announcement && (
-                    <button onClick={() => { setAnnouncement(''); }} className="text-xs text-red-600 hover:text-red-800 font-semibold">Clear</button>
-                  )}
-                  <button onClick={saveAnnouncement} disabled={busy} className="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white text-xs font-bold transition-colors">
-                    {busy ? 'Saving...' : announcement ? 'Publish' : 'Clear announcement'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {superTab === 'sessions' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-extrabold text-purple-900">Active Executive Sessions</h3>
-                <button onClick={loadExecSessions} className="text-xs text-purple-700 underline">Refresh</button>
-              </div>
-              {execSessions.length === 0 ? (
-                <p className="text-xs text-purple-700">No active sessions detected. Executives must be on /manager or /dashboard for at least 10 seconds to appear.</p>
-              ) : (
-                <div className="space-y-2">
-                  {execSessions.map((s, i) => (
-                    <div key={i} className="bg-white rounded-lg p-3 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">{s.page === 'manager' ? 'Check-in Desk' : 'Dashboard'}</div>
-                        <div className="text-xs text-slate-500">{s.page} page</div>
-                      </div>
-                      <div className="text-2xl font-extrabold text-purple-700">{Number(s.device_count)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {superTab === 'archives' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4 max-h-72 overflow-auto">
-              <h3 className="text-sm font-extrabold text-purple-900 mb-2">Past Clearance Days</h3>
-              {archiveDates.length === 0 ? (
-                <p className="text-xs text-purple-700">No archived sessions yet. Archives are created when you Reset Day.</p>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {archiveDates.map(d => (
-                      <button
-                        key={d.session_date}
-                        onClick={() => loadArchiveForDate(d.session_date)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                          archiveDate === d.session_date ? 'bg-purple-700 text-white' : 'bg-white text-purple-800 hover:bg-purple-100'
-                        }`}
-                      >
-                        {new Date(d.session_date + 'T00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })} ({Number(d.entry_count)})
-                      </button>
-                    ))}
-                  </div>
-                  {archiveDate && archiveRows.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-purple-700">{archiveRows.length} entries</span>
-                        <button
-                          onClick={() => {
-                            const headers = ['Queue #', 'Name', 'State Code', 'Wave', 'Registered', 'Served', 'Voided']
-                            const csvRows = [headers.join(',')]
-                            archiveRows.forEach(r => csvRows.push([r.queue_number, `"${(r.full_name||'').replace(/"/g,'""')}"`, r.state_code, r.batch_number, r.registered_at ? new Date(r.registered_at).toLocaleString('en-NG') : '', r.served_at ? new Date(r.served_at).toLocaleString('en-NG') : '', r.voided ? 'Yes' : ''].join(',')))
-                            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
-                            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `archive-${archiveDate}.csv`; a.click()
-                            flash('Archive CSV downloaded.')
-                          }}
-                          className="text-xs font-bold text-purple-700 underline"
-                        >
-                          Export CSV
-                        </button>
-                      </div>
-                      <table className="w-full text-xs">
-                        <thead><tr className="text-left text-purple-700"><th className="py-1 pr-2">Q#</th><th className="py-1 pr-2">Name</th><th className="py-1 pr-2">Code</th><th className="py-1">Status</th></tr></thead>
-                        <tbody>
-                          {archiveRows.slice(0, 50).map(r => (
-                            <tr key={r.id} className={`border-t border-purple-100 ${r.voided ? 'opacity-40' : ''}`}>
-                              <td className="py-1 pr-2 font-bold">{r.queue_number}</td>
-                              <td className="py-1 pr-2">{r.full_name}</td>
-                              <td className="py-1 pr-2 font-mono">{r.state_code}</td>
-                              <td className="py-1">{r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}</td>
-                            </tr>
-                          ))}
-                          {archiveRows.length > 50 && <tr><td colSpan={4} className="py-1 text-purple-600">...and {archiveRows.length - 50} more (export CSV for full list)</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {superTab === 'duplicates' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-extrabold text-purple-900">Duplicate Detector</h3>
-                <button onClick={loadDuplicates} className="text-xs text-purple-700 underline">Refresh</button>
-              </div>
-              {duplicates.length === 0 ? (
-                <p className="text-xs text-purple-700">No duplicates found. This checks for entries with the same name AND state code.</p>
-              ) : (
-                <div className="space-y-1">
-                  {duplicates.map((d, i) => (
-                    <div key={i} className="bg-white rounded-lg p-2 flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-bold text-slate-900">{d.full_name}</span>
-                        <span className="text-xs text-slate-500 ml-2 font-mono">{d.state_code}</span>
-                      </div>
-                      <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">{Number(d.match_count)}x</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {superTab === 'venue' && (
-            <div className="border-t-2 border-purple-100 bg-white p-4 space-y-4">
-              <h3 className="text-sm font-extrabold text-purple-900">📍 Venue & Location Settings</h3>
-
-              {/* Geofencing toggle */}
-              <div className="bg-white rounded-xl border border-purple-200 p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">Location check (geofencing)</div>
-                    <div className="text-xs text-slate-500 mt-0.5">When OFF, corps members can join from anywhere — useful when GPS is unreliable.</div>
-                  </div>
-                  <button
-                    onClick={() => setVenueGeoEnabled(v => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${venueGeoEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${venueGeoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Venue coordinates */}
-              <div className={`space-y-3 ${!venueGeoEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div>
-                  <label className="text-xs font-bold text-purple-900 block mb-1">Venue Latitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={venueLat}
-                    onChange={e => setVenueLat(e.target.value)}
-                    placeholder="e.g. 6.4360344"
-                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-purple-900 block mb-1">Venue Longitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={venueLng}
-                    onChange={e => setVenueLng(e.target.value)}
-                    placeholder="e.g. 3.523451"
-                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-purple-900 block mb-1">
-                    Allowed radius (meters)
-                    <span className="ml-1 text-purple-500 font-normal">— how far from venue coords a phone can be</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="2000"
-                    value={venueRadius}
-                    onChange={e => setVenueRadius(e.target.value)}
-                    placeholder="350"
-                    className="w-full rounded-lg border-2 border-purple-200 focus:border-purple-600 focus:outline-none px-3 py-2 text-sm font-mono"
-                  />
-                  <p className="text-xs text-purple-600 mt-1">
-                    💡 <strong>Tip:</strong> If corps members are getting rejected despite being at the venue, increase this to 400–500m to account for GPS inaccuracy.
-                  </p>
-                </div>
-              </div>
-
-              {/* How to get coordinates */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                <strong>How to get your venue coordinates:</strong> Open Google Maps, long-press on the exact venue location, and copy the numbers that appear at the bottom (e.g. 6.436034, 3.523451).
-              </div>
-
-              {venueSuccess && (
-                <div className="bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg px-3 py-2 text-sm font-bold">
-                  ✅ {venueSuccess}
-                </div>
-              )}
-              <button
-                onClick={saveVenueSettings}
-                disabled={busy}
-                className="w-full py-2.5 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold text-sm transition-colors"
-              >
-                {busy ? 'Saving...' : 'Save venue settings'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Bulk action bar */}
-      {selectedRows.size > 0 && (
-        <div className="mb-3 bg-purple-100 border-2 border-purple-300 rounded-xl p-3 flex items-center justify-between">
-          <span className="text-sm font-bold text-purple-900">{selectedRows.size} selected</span>
-          <div className="flex gap-2">
-            <button onClick={bulkMarkServed} disabled={busy} className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white text-xs font-bold">Mark served</button>
-            <button onClick={bulkVoid} disabled={busy} className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white text-xs font-bold">Void all</button>
-            <button onClick={() => setSelectedRows(new Set())} className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold">Clear</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Search bar ── */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => { setSearchQuery(e.target.value); setTablePage(0) }}
-          placeholder="Search by name or state code..."
-          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none bg-white text-slate-950 placeholder-slate-500"
-        />
+      {/* ── Segmented control ── */}
+      <div className="flex mb-4 p-0.5 rounded-xl" style={{ backgroundColor: '#E0DDD6' }}>
+        {[{ key: 'live', label: 'Live' }, { key: 'queue', label: 'Queue' }].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setDashTab(key)}
+            className="flex-1 py-2 text-sm font-semibold rounded-[10px] transition-all"
+            style={{
+              backgroundColor: dashTab === key ? 'white' : 'transparent',
+              color: dashTab === key ? '#1A1A1A' : '#8C8880',
+              boxShadow: dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* ── Table ── */}
-      <div className="flex-1 min-h-0 bg-white rounded-xl shadow border border-slate-200 overflow-hidden flex flex-col">
-        <div className="overflow-auto flex-1">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-200 text-slate-950 sticky top-0 z-10">
-              <tr>
-                {isSuperAdmin && (
-                  <th className="px-2 py-2.5 w-8">
-                    <input
-                      type="checkbox"
-                      checked={filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).length > 0 && filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).every(r => selectedRows.has(r.id))}
-                      onChange={selectAllVisible}
-                      className="w-4 h-4 rounded accent-purple-700"
-                      aria-label="Select all on this page"
-                    />
-                  </th>
-                )}
-                {SORTABLE.map((c) => (
-                  <th
-                    key={c.key}
-                    onClick={() => toggleSort(c.key)}
-                    className="px-3 py-2.5 text-left font-extrabold cursor-pointer select-none whitespace-nowrap text-xs uppercase tracking-wide"
-                  >
-                    {c.label}{' '}
-                    {sortKey === c.key && (
-                      <span className="text-emerald-700">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>
-                    )}
-                  </th>
-                ))}
-                <th className="px-3 py-2.5 text-left font-extrabold text-xs uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedRows.length === 0 && (
-                <tr>
-                  <td colSpan={isSuperAdmin ? 8 : 7} className="px-3 py-8 text-center text-slate-500 font-medium">
-                    {searchQuery ? 'No matches found.' : 'No registrations yet.'}
-                  </td>
-                </tr>
-              )}
-              {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map((r, i) => (
-                <tr
-                  key={r.id}
-                  className={`border-t border-slate-100 transition-colors ${
-                    r.voided ? 'opacity-40' : ''
-                  } ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'} ${
-                    !r.voided && !r.served_at ? 'hover:bg-emerald-50' : ''
-                  }`}
-                >
-                  {isSuperAdmin && (
-                    <td className="px-2 py-2 w-8">
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.has(r.id)}
-                        onChange={() => toggleSelectRow(r.id)}
-                        className="w-4 h-4 rounded accent-purple-700"
-                        aria-label={`Select ${r.full_name}`}
-                      />
-                    </td>
-                  )}
-                  <td className="px-3 py-2 font-extrabold text-slate-950">{r.queue_number}</td>
-                  <td className="px-3 py-2 font-semibold text-slate-950">
-                    {r.full_name}
-                    {isSuperAdmin && r.admin_note && <span title={r.admin_note} className="ml-1 text-purple-500 cursor-help">{'\uD83D\uDCDD'}</span>}
-                  </td>
-                  <td className="px-3 py-2 font-mono text-slate-800">{r.state_code}</td>
-                  <td className="px-3 py-2 text-slate-950">{r.batch_number}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-slate-800">
-                    {formatTime(r.registered_at)}
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.voided ? (
-                      <span className="font-bold text-red-800">Voided</span>
-                    ) : r.served_at ? (
-                      <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
-                        <Check className="w-3.5 h-3.5" /> Served
-                      </span>
-                    ) : (
-                      <span className="font-bold text-slate-700">Waiting</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => toggleServed(r)}
-                        disabled={rowBusy === r.id || r.voided}
-                        className={`text-xs font-bold px-2.5 py-1.5 rounded transition-colors ${
-                          r.served_at
-                            ? 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white'
-                            : 'bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white'
-                        } disabled:bg-slate-300 disabled:cursor-not-allowed`}
-                      >
-                        {rowBusy === r.id ? '...' : r.served_at ? 'Undo served' : 'Mark served'}
-                      </button>
-                      <button
-                        onClick={() => r.voided ? toggleVoid(r) : setShowVoidConfirm(r)}
-                        disabled={rowBusy === r.id}
-                        aria-label={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
-                        title={r.voided ? `Restore ${r.full_name}` : `Void ${r.full_name}`}
-                        className={`p-1.5 rounded transition-colors ${
-                          r.voided
-                            ? 'text-amber-600 hover:text-amber-800 hover:bg-amber-100 active:bg-amber-200'
-                            : 'text-slate-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200'
-                        } disabled:opacity-30 disabled:cursor-not-allowed`}
-                      >
-                        {r.voided ? <RotateCcw className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                      </button>
-                      {isSuperAdmin && (
-                        <>
-                          <button
-                            onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
-                            disabled={rowBusy === r.id}
-                            aria-label={`Edit ${r.full_name}`}
-                            title={`Edit ${r.full_name}`}
-                            className="p-1.5 rounded text-purple-500 hover:text-purple-700 hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-30"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => { setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
-                            disabled={rowBusy === r.id}
-                            aria-label={`Move ${r.full_name} to different wave`}
-                            title="Move to wave"
-                            className="p-1.5 rounded text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-30"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => { setShowNoteModal(r); setNoteText(r.admin_note || '') }}
-                            disabled={rowBusy === r.id}
-                            aria-label={`Note on ${r.full_name}`}
-                            title="Add/edit note"
-                            className={`p-1.5 rounded transition-colors disabled:opacity-30 ${r.admin_note ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-100' : 'text-slate-400 hover:text-purple-600 hover:bg-purple-100'}`}
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteConfirm(r)}
-                            disabled={rowBusy === r.id}
-                            aria-label={`Delete ${r.full_name}`}
-                            title={`Permanently delete ${r.full_name}`}
-                            className="p-1.5 rounded text-red-400 hover:text-red-700 hover:bg-red-100 active:bg-red-200 transition-colors disabled:opacity-30"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredAndSortedRows.length > 0 && (
-          <div className="px-3 py-1.5 border-t border-slate-200 text-xs text-slate-600 bg-slate-50 font-medium flex-shrink-0 flex items-center justify-between">
-            <span>
-              {searchQuery
-                ? `${filteredAndSortedRows.length} of ${rows.length} entries`
-                : `${rows.length} entries total`}
-            </span>
-            {filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setTablePage(p => Math.max(0, p - 1))}
-                  disabled={tablePage === 0}
-                  className="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-40 font-bold"
-                  aria-label="Previous page"
-                >
-                  {'\u2190'}
-                </button>
-                <span className="px-1">{tablePage + 1}/{Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE)}</span>
-                <button
-                  onClick={() => setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1))}
-                  disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
-                  className="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 disabled:opacity-40 font-bold"
-                  aria-label="Next page"
-                >
-                  {'\u2192'}
-                </button>
+      {/* ═══ LIVE TAB ═══ */}
+      {dashTab === 'live' && (
+        <div className="space-y-3">
+
+          {/* Now Serving card */}
+          <div className="bg-white rounded-xl px-4 py-4" style={{ border: '1px solid #E0DDD6', borderLeft: '4px solid #F59B0A' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Now Serving</div>
+            <div className="text-5xl font-extrabold leading-none" style={{ color: '#1A1A1A' }}>
+              {settings?.current_batch ? `Wave ${settings.current_batch}` : '—'}
+            </div>
+            {currentWaveProgress && (
+              <div className="text-sm font-semibold mt-2" style={{ color: '#8C8880' }}>
+                {currentWaveProgress.served}/{currentWaveProgress.total} served in this wave
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* 2-col stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <LiveStatCard label="Registered" value={counts.registered} />
+            <LiveStatCard label="Waiting" value={counts.waiting} />
+          </div>
+
+          {/* Served full-width */}
+          <LiveStatCard label="Served" value={counts.served} fullWidth />
+
+          {/* Super Admin stub */}
+          {isSuperAdmin && (
+            <div className="rounded-xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
+              <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: '#1B6B3A' }}>
+                <ShieldCheck className="w-4 h-4 text-white" />
+                <span className="text-white font-bold text-sm">Super Admin</span>
+              </div>
+              <div className="px-4 py-6 text-center bg-white">
+                <p className="text-sm font-medium" style={{ color: '#8C8880' }}>Advanced controls coming soon.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ QUEUE TAB ═══ */}
+      {dashTab === 'queue' && (
+        <div>
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#8C8880' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
+              placeholder="Search by name or state code…"
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
+              style={{ border: '1px solid #E0DDD6', color: '#1A1A1A' }}
+              onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
+              onBlur={e => { e.target.style.borderColor = '#E0DDD6'; e.target.style.boxShadow = 'none' }}
+            />
+          </div>
+
+          <div className="text-xs font-medium mb-2" style={{ color: '#8C8880' }}>
+            {searchQuery
+              ? `${filteredAndSortedRows.length} of ${rows.length} members`
+              : `${rows.length} members total`}
+          </div>
+
+          {/* List */}
+          <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E0DDD6' }}>
+            {filteredAndSortedRows.length === 0 && (
+              <div className="py-12 text-center text-sm" style={{ color: '#8C8880' }}>
+                {searchQuery ? 'No members found.' : 'No registrations yet.'}
+              </div>
+            )}
+            <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
+              {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
+                <div key={r.id}>
+                  {/* Row */}
+                  <div
+                    className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors active:opacity-70"
+                    style={{ backgroundColor: expandedRow === r.id ? '#F9F6F0' : 'white' }}
+                    onClick={() => setExpandedRow(expandedRow === r.id ? null : r.id)}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                    >
+                      {r.queue_number}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`text-sm font-semibold truncate ${r.voided ? 'line-through opacity-50' : ''}`}
+                        style={{ color: '#1A1A1A' }}
+                      >
+                        {r.full_name}
+                      </div>
+                      <div className="text-xs font-mono mt-0.5" style={{ color: '#8C8880' }}>
+                        {r.state_code}
+                      </div>
+                    </div>
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                    >
+                      W{r.batch_number}
+                    </span>
+                  </div>
+
+                  {/* Expanded panel */}
+                  {expandedRow === r.id && (
+                    <div className="px-4 py-4" style={{ backgroundColor: '#F9F6F0', borderTop: '1px solid #E0DDD6' }}>
+                      <div className="grid grid-cols-2 gap-3 text-xs mb-3">
+                        <div>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Status</div>
+                          <div className="font-bold" style={{ color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#8C8880' }}>
+                            {r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Registered</div>
+                          <div className="font-medium" style={{ color: '#1A1A1A' }}>{formatTime(r.registered_at)}</div>
+                        </div>
+                      </div>
+                      {!r.voided && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleServed(r) }}
+                            disabled={rowBusy === r.id}
+                            className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
+                            style={{ backgroundColor: r.served_at ? '#F59B0A' : '#1B6B3A' }}
+                          >
+                            {rowBusy === r.id ? '...' : r.served_at ? 'Undo served' : 'Mark served'}
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); setShowVoidConfirm(r) }}
+                            disabled={rowBusy === r.id}
+                            className="px-4 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                            style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
+                          >
+                            Void
+                          </button>
+                          {isSuperAdmin && (
+                            <>
+                              <button
+                                onClick={e => { e.stopPropagation(); setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
+                                disabled={rowBusy === r.id}
+                                className="px-3 py-2 rounded-lg transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
+                                disabled={rowBusy === r.id}
+                                className="px-3 py-2 rounded-lg transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {r.voided && (
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleVoid(r) }}
+                          disabled={rowBusy === r.id}
+                          className="w-full py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                          style={{ backgroundColor: 'rgba(245,155,10,0.1)', color: '#F59B0A' }}
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pagination */}
+          {filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: '#8C8880' }}>
+              <button
+                onClick={() => setTablePage(p => Math.max(0, p - 1))}
+                disabled={tablePage === 0}
+                className="px-3 py-1.5 rounded-lg bg-white disabled:opacity-40"
+                style={{ border: '1px solid #E0DDD6' }}
+              >
+                Previous
+              </button>
+              <span>{tablePage + 1} / {Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE)}</span>
+              <button
+                onClick={() => setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1))}
+                disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
+                className="px-3 py-1.5 rounded-lg bg-white disabled:opacity-40"
+                style={{ border: '1px solid #E0DDD6' }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-950 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold z-50">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: '#1A1A1A' }}>
           {toast}
         </div>
       )}
@@ -2223,6 +1662,19 @@ export default function Dashboard() {
           </div>
         </Modal>
       )}
+    </div>
+  )
+}
+
+// ── Live stat card ───────────────────────────────────────────
+function LiveStatCard({ label, value, fullWidth }) {
+  return (
+    <div
+      className={`bg-white rounded-xl px-4 py-4 ${fullWidth ? 'col-span-2' : ''}`}
+      style={{ border: '1px solid #E0DDD6' }}
+    >
+      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>{label}</div>
+      <div className="text-4xl font-extrabold leading-none" style={{ color: '#1A1A1A' }}>{value}</div>
     </div>
   )
 }

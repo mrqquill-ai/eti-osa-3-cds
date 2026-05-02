@@ -6,6 +6,8 @@ import Manager from './pages/Manager.jsx'
 import Status from './pages/Status.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Join from './pages/Join.jsx'
+import Members from './pages/Members.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 import AuthLayout from './pages/auth/AuthLayout.jsx'
 import Login from './pages/auth/Login.jsx'
 import ForgotPassword from './pages/auth/ForgotPassword.jsx'
@@ -23,12 +25,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
         {/* ── App pages (shared header/nav shell) ── */}
         <Route element={<App />}>
-          <Route index element={<Navigate to="/join" replace />} />
-          <Route path="/manager" element={<Manager />} />
+          <Route index                   element={<Navigate to="/join" replace />} />
+          <Route path="/manager"         element={<Manager />} />
           <Route path="/status/:stateCode" element={<Status />} />
-          <Route path="/join" element={<Join />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="*" element={<Navigate to="/join" replace />} />
+          <Route path="/join"            element={<Join />} />
+          <Route path="/dashboard"       element={<Dashboard />} />
+          <Route path="/members"         element={<Members />} />
+          <Route path="/settings"        element={<SettingsPage />} />
+          <Route path="*"                element={<Navigate to="/join" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -27,6 +27,24 @@ html, body, #root {
 
 body {
   -webkit-tap-highlight-color: transparent;
+  background-color: #F9F6F0;
+}
+
+/* Hide scrollbar but keep scrollable — used for chip rows */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Safe-area utilities for fixed elements */
+.safe-top    { padding-top:    env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Auth input: update to new border token */
+.auth-input {
+  border-color: #E0DDD6 !important;
+}
+.auth-input:focus {
+  border-color: #1B6B3A !important;
+  box-shadow: 0 0 0 3px rgba(27, 107, 58, 0.12) !important;
 }
 
 /* Dark mode for dashboard */

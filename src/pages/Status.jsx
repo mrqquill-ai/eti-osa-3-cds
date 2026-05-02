@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { CheckCircle, Bell, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 export default function Status() {
@@ -167,45 +168,45 @@ export default function Status() {
   let statusBlock
   if (isCleared) {
     statusBlock = (
-      <div className="bg-emerald-100 border-2 border-emerald-600 text-emerald-900 rounded-2xl p-6 text-center">
-        <div className="text-6xl">{'\u2705'}</div>
-        <div className="text-2xl font-extrabold mt-2">Cleared</div>
-        <div className="text-sm mt-1">You are done. Have a great day.</div>
+      <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: 'rgba(27,107,58,0.08)', border: '2px solid #1B6B3A' }}>
+        <CheckCircle className="w-12 h-12 mx-auto" style={{ color: '#1B6B3A' }} />
+        <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Cleared</div>
+        <div className="text-sm mt-1" style={{ color: '#1B6B3A' }}>You are done. Have a great day.</div>
       </div>
     )
   } else if (isBeingServed) {
     statusBlock = (
-      <div className="bg-amber-100 border-2 border-amber-500 text-amber-900 rounded-2xl p-6 text-center animate-pulse">
-        <div className="text-6xl">{'\uD83D\uDD14'}</div>
-        <div className="text-2xl font-extrabold mt-2">Your wave is now being served</div>
-        <div className="text-base mt-1">Head to clearance immediately.</div>
+      <div className="rounded-2xl p-6 text-center animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '2px solid #F59B0A' }}>
+        <Bell className="w-12 h-12 mx-auto" style={{ color: '#F59B0A' }} />
+        <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Your wave is now being served</div>
+        <div className="text-base mt-1" style={{ color: '#92640A' }}>Head to clearance immediately.</div>
       </div>
     )
   } else if (currentBatch > 0 && batchesAhead > 0) {
     statusBlock = (
-      <div className="bg-slate-100 border-2 border-slate-300 text-slate-900 rounded-2xl p-6 text-center">
-        <div className="text-6xl">{'\u23F3'}</div>
-        <div className="text-2xl font-extrabold mt-2">Waiting</div>
-        <div className="text-base mt-1">
+      <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F9F6F0', border: '2px solid #E0DDD6' }}>
+        <Clock className="w-12 h-12 mx-auto" style={{ color: '#8C8880' }} />
+        <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
+        <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
-        <div className="text-sm mt-1 text-slate-700">
-          Wave {currentBatch} is being served now {'\u2014'} {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
+        <div className="text-sm mt-1" style={{ color: '#8C8880' }}>
+          Wave {currentBatch} is being served now \u2014 {batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
         </div>
         {batchesAhead > 0 && (
-          <div className="text-xs mt-1 text-slate-600">Estimated wait: ~{batchesAhead * 10}-{batchesAhead * 15} minutes</div>
+          <div className="text-xs mt-1" style={{ color: '#8C8880' }}>Estimated wait: ~{batchesAhead * 10}\u2013{batchesAhead * 15} minutes</div>
         )}
       </div>
     )
   } else {
     statusBlock = (
-      <div className="bg-slate-100 border-2 border-slate-300 text-slate-900 rounded-2xl p-6 text-center">
-        <div className="text-6xl">{'\u23F3'}</div>
-        <div className="text-2xl font-extrabold mt-2">Waiting</div>
-        <div className="text-base mt-1">
+      <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F9F6F0', border: '2px solid #E0DDD6' }}>
+        <Clock className="w-12 h-12 mx-auto" style={{ color: '#8C8880' }} />
+        <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
+        <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
-        <div className="text-sm mt-1 text-slate-700">
+        <div className="text-sm mt-1" style={{ color: '#8C8880' }}>
           Clearance has not started yet
         </div>
       </div>
