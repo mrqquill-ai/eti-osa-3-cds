@@ -127,6 +127,31 @@ export default function Status() {
     return () => clearInterval(fastPoll)
   }, [reg?.batch_number, reg?.served_at, settings?.current_batch, code])
 
+  // Realtime — settings changes (wave advances, announcement updates) appear immediately
+  useEffect(() => {
+    const ch = supabase
+      .channel('status-settings')
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public',
+        table: 'session_settings', filter: 'id=eq.1',
+      }, payload => {
+        const s = payload.new
+        // Vibrate when this person's wave just got called
+        if (
+          reg &&
+          prevWaveServing.current !== s.current_batch &&
+          s.current_batch === reg?.batch_number &&
+          !reg?.served_at
+        ) {
+          try { if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]) } catch {}
+        }
+        prevWaveServing.current = s.current_batch
+        setSettings(s)
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [reg])
+
   if (loading) {
     return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
   }
@@ -221,7 +246,7 @@ export default function Status() {
       {/* Announcement banner */}
       {settings?.announcement && (
         <div className="bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 mt-4 text-sm font-semibold text-center">
-          {'\uD83D\uDCE2'} {settings.announcement}
+          {'\u{1F4E2}'} {settings.announcement}
         </div>
       )}
 
