@@ -954,7 +954,7 @@ export default function Dashboard() {
       <button
         onClick={handleCallNextBatch}
         disabled={busy || !settings}
-        className="w-full flex items-center justify-center gap-2 mb-4 py-4 rounded-xl text-white font-bold text-base transition-opacity active:opacity-80 disabled:opacity-40"
+        className="w-full flex items-center justify-center gap-2 mb-2 py-4 rounded-xl text-white font-bold text-base transition-opacity active:opacity-80 disabled:opacity-40"
         style={{ backgroundColor: '#1B6B3A' }}
       >
         <ChevronRight className="w-5 h-5" />
@@ -968,6 +968,19 @@ export default function Dashboard() {
           </span>
         )}
       </button>
+
+      {/* ── Go back to previous wave ── */}
+      {settings?.current_batch > 0 && (
+        <button
+          onClick={goBackBatch}
+          disabled={busy}
+          className="w-full flex items-center justify-center gap-2 mb-4 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80 disabled:opacity-40"
+          style={{ backgroundColor: '#F1F5F9', color: '#475569' }}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Go back to Wave {settings.current_batch - 1 === 0 ? 'start' : settings.current_batch - 1}
+        </button>
+      )}
 
       {/* ── Segmented control ── */}
       <div className="flex mb-4 p-0.5 rounded-xl" style={{ backgroundColor: '#E2E8F0' }}>

@@ -6,7 +6,8 @@ import Manager from './pages/Manager.jsx'
 import Status from './pages/Status.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Join from './pages/Join.jsx'
-import Members from './pages/Members.jsx'
+import Stats from './pages/Stats.jsx'
+import Announce from './pages/Announce.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import AuthLayout from './pages/auth/AuthLayout.jsx'
 import Login from './pages/auth/Login.jsx'
@@ -30,7 +31,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/status/:stateCode" element={<Status />} />
           <Route path="/join"            element={<Join />} />
           <Route path="/dashboard"       element={<Dashboard />} />
-          <Route path="/members"         element={<Members />} />
+          <Route path="/stats"           element={<Stats />} />
+          <Route path="/announce"        element={<Announce />} />
           <Route path="/settings"        element={<SettingsPage />} />
           <Route path="*"                element={<Navigate to="/join" replace />} />
         </Route>

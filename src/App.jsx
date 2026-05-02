@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, ScanLine, Users, Settings, Copy, Shield } from 'lucide-react'
+import { LayoutGrid, ScanLine, BarChart2, Megaphone, Settings, Shield } from 'lucide-react'
 import { supabase } from './lib/supabase.js'
 import { useOnlineStatus } from './lib/useOnlineStatus.js'
 
@@ -33,7 +33,8 @@ function initials(user) {
 const TABS = [
   { to: '/dashboard', icon: LayoutGrid, label: 'Dashboard' },
   { to: '/manager',   icon: ScanLine,   label: 'Check In'  },
-  { to: '/members',   icon: Users,      label: 'Members'   },
+  { to: '/stats',     icon: BarChart2,  label: 'Stats'     },
+  { to: '/announce',  icon: Megaphone,  label: 'Announce'  },
   { to: '/settings',  icon: Settings,   label: 'Settings'  },
 ]
 
@@ -51,7 +52,6 @@ export default function App() {
   const [user,        setUser]        = useState(null)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [showSheet,   setShowSheet]   = useState(false)
-  const [copied,      setCopied]      = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -83,30 +83,12 @@ export default function App() {
     return () => supabase.removeChannel(ch)
   }, [isExecPage])
 
-  /* ── Copy check-in link ── */
-  async function copyLink() {
-    const url = `${window.location.origin}/join`
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const inp = document.createElement('input')
-      inp.value = url
-      document.body.appendChild(inp)
-      inp.select()
-      document.execCommand('copy')
-      document.body.removeChild(inp)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   async function signOut() {
     setShowSheet(false)
     await supabase.auth.signOut()
     navigate('/login', { replace: true })
   }
 
-  const checkInUrl = `${window.location.origin}/join`
   const roleLabel  = user?.user_metadata?.role === 'super_admin'
     ? 'Super Admin'
     : (user?.user_metadata?.role
@@ -115,7 +97,7 @@ export default function App() {
 
   /* ─────────────────────────────────────────── */
   return (
-    <div className="min-h-screen flex flex-col bg-cream">
+    <div className="min-h-screen flex flex-col bg-slate-50">
 
       {/* ── Offline banner ── */}
       {!online && (
@@ -161,35 +143,22 @@ export default function App() {
             className="fixed left-0 right-0 z-40 bg-white"
             style={{ top: '52px', borderBottom: '1px solid #E0DDD6' }}
           >
-            {/* Session name + open/closed badge + copy link */}
+            {/* Session name + open/closed badge */}
             <div className="flex items-center justify-between gap-3 px-4 h-11">
               <span className="text-sm font-semibold truncate" style={{ color: '#1A1A1A' }}>
                 Eti-Osa 3 Special CDS
               </span>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: sessionOpen ? G : '#8C8880' }}
-                  />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: sessionOpen ? G : '#8C8880' }}
-                  >
-                    {sessionOpen ? 'Open' : 'Closed'}
-                  </span>
-                </div>
-                <button
-                  onClick={copyLink}
-                  aria-label="Copy check-in link"
-                  className="flex-shrink-0 transition-colors"
-                  style={{ color: '#8C8880' }}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: sessionOpen ? G : '#8C8880' }}
+                />
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: sessionOpen ? G : '#8C8880' }}
                 >
-                  {copied
-                    ? <span className="text-xs font-semibold" style={{ color: G }}>Copied!</span>
-                    : <Copy className="w-4 h-4" />
-                  }
-                </button>
+                  {sessionOpen ? 'Open' : 'Closed'}
+                </span>
               </div>
             </div>
           </div>

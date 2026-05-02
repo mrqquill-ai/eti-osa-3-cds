@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Lock, Unlock, Download, PlayCircle, RotateCcw,
-  KeyRound, MapPin, ChevronRight, AlertTriangle, X
+  Link2, Copy, MapPin, ChevronRight, AlertTriangle, X
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
@@ -92,6 +92,8 @@ export default function SettingsPage() {
   const [sheet, setSheet] = useState(null)
   // sheet values: 'closeSession' | 'newSession' | 'resetDay' | 'waveSize' | 'changePin' | 'location'
 
+  const [copied,         setCopied]          = useState(false)
+
   /* inputs */
   const [newBatchSize,   setNewBatchSize]    = useState(30)
   const [newPin,         setNewPin]          = useState('')
@@ -130,6 +132,16 @@ export default function SettingsPage() {
 
   function flash(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
   function closeSheet() { setSheet(null); setError('') }
+
+  async function copyLink() {
+    const url = `${window.location.origin}/join`
+    try { await navigator.clipboard.writeText(url) } catch {
+      const inp = document.createElement('input')
+      inp.value = url; document.body.appendChild(inp); inp.select()
+      document.execCommand('copy'); document.body.removeChild(inp)
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
 
   /* ── Actions ── */
   async function toggleRegistration() {
@@ -335,18 +347,30 @@ export default function SettingsPage() {
         />
       </div>
 
-      {/* ══ SECURITY ══ */}
+      {/* ══ CHECK-IN LINK ══ */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: `1px solid ${LINE}` }}>
         <div className="px-5 py-3 border-b" style={{ borderColor: LINE }}>
-          <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Security</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Check-in Link</h2>
         </div>
-        <SettingsRow
-          icon={KeyRound}
-          title="Change Executive PIN"
-          subtitle="Update the PIN used by all executives"
-          onClick={() => { setNewPin(''); setSheet('changePin'); setError('') }}
-          disabled={!adminPin}
-        />
+        <div className="px-5 py-4">
+          <p className="text-xs mb-3" style={{ color: MUTED }}>
+            Share this link with corps members so they can join the queue from their phones.
+          </p>
+          <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
+            <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: MUTED }} />
+            <span className="flex-1 text-xs font-mono truncate" style={{ color: INK }}>
+              {window.location.origin}/join
+            </span>
+            <button
+              onClick={copyLink}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:opacity-70"
+              style={{ backgroundColor: copied ? 'rgba(27,107,58,0.1)' : '#F1F5F9', color: copied ? G : MUTED }}
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ══ LOCATION ══ */}
@@ -492,31 +516,6 @@ export default function SettingsPage() {
               value={newBatchSize}
               onChange={e => setNewBatchSize(Number(e.target.value))}
               className="w-full rounded-xl px-4 py-3 text-lg font-bold text-center outline-none border-2 border-slate-200 focus:border-emerald-700"
-              style={{ color: INK }}
-            />
-          </div>
-          {error && <p className="text-xs font-semibold mb-2" style={{ color: DESTRUCTIVE }}>{error}</p>}
-        </ConfirmSheet>
-      )}
-
-      {/* Change executive PIN */}
-      {sheet === 'changePin' && (
-        <ConfirmSheet
-          title="Change executive PIN"
-          body="All executives will use this new PIN."
-          confirmLabel="Save PIN"
-          onCancel={() => { closeSheet(); setNewPin('') }}
-          onConfirm={changePin}
-          busy={busy}
-        >
-          <div className="mb-3">
-            <input
-              type="password"
-              value={newPin}
-              onChange={e => setNewPin(e.target.value)}
-              placeholder="New PIN (min 4 characters)"
-              autoFocus
-              className="w-full rounded-xl px-4 py-3 text-xl font-bold text-center tracking-widest outline-none border-2 border-slate-200 focus:border-emerald-700"
               style={{ color: INK }}
             />
           </div>
