@@ -587,6 +587,32 @@ export default function SettingsPage() {
               </button>
             </div>
 
+            {/* Use current location button */}
+            {geoEnabled && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!navigator.geolocation) { setError('Geolocation not supported on this device.'); return }
+                  setError('')
+                  setBusy(true)
+                  navigator.geolocation.getCurrentPosition(
+                    pos => {
+                      setVenueLat(pos.coords.latitude.toFixed(7))
+                      setVenueLng(pos.coords.longitude.toFixed(7))
+                      setBusy(false)
+                    },
+                    () => { setError('Could not get location. Allow GPS and try again.'); setBusy(false) },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                  )
+                }}
+                disabled={busy}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-70 disabled:opacity-40"
+                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G }}
+              >
+                📍 Use my current location
+              </button>
+            )}
+
             <div className={geoEnabled ? '' : 'opacity-50 pointer-events-none'}>
               <label className="block text-xs font-semibold mb-1" style={{ color: MUTED }}>Latitude</label>
               <input
@@ -622,11 +648,8 @@ export default function SettingsPage() {
                 style={{ color: INK }}
               />
               <p className="text-xs mt-1" style={{ color: MUTED }}>
-                Tip: If members are being rejected at the venue, increase to 400–500 m.
+                Tip: 350 m works well. Increase to 500 m if members near the venue are being rejected.
               </p>
-            </div>
-            <div className="rounded-lg p-3 text-xs" style={{ backgroundColor: '#FEF9E7', color: '#92640A' }}>
-              How to get coordinates: Open Google Maps, long-press the venue, copy the numbers at the bottom.
             </div>
           </div>
           {error && <p className="text-xs font-semibold mb-2" style={{ color: DESTRUCTIVE }}>{error}</p>}

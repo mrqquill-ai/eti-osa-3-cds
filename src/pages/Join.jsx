@@ -359,7 +359,7 @@ export default function Join() {
         <div className="text-5xl mb-3">{'\uD83D\uDCCD'}</div>
         <h1 className="text-xl font-extrabold text-red-900">You are not at the venue</h1>
         <p className="text-slate-700 mt-2 text-sm">
-          You must be at <span className="font-semibold">Jamatul Islamiyya Primary School, Baale St, Lekki</span> to join the queue.
+          You must be physically present at the CDS venue to join the queue.
         </p>
         {distance != null && (
           <p className="text-slate-600 text-xs mt-2">
