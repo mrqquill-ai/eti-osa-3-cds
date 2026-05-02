@@ -30,7 +30,7 @@ export default function StatsPage() {
   useEffect(() => {
     async function load() {
       const [{ data: regs }, { data: s }] = await Promise.all([
-        supabase.from('registrations').select('id, status, batch_number, created_at'),
+        supabase.from('registrations').select('id, served_at, voided, batch_number, registered_at'),
         supabase.from('session_settings').select('*').eq('id', 1).single(),
       ])
       setRegistrations(regs || [])
@@ -43,7 +43,7 @@ export default function StatsPage() {
     const ch = supabase
       .channel('stats-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => {
-        supabase.from('registrations').select('id, status, batch_number, created_at').then(({ data }) => {
+        supabase.from('registrations').select('id, served_at, voided, batch_number, registered_at').then(({ data }) => {
           if (data) setRegistrations(data)
         })
       })
@@ -55,19 +55,20 @@ export default function StatsPage() {
   }, [])
 
   /* ── Derived stats ── */
-  const total    = registrations.length
-  const served   = registrations.filter(r => r.status === 'served').length
-  const waiting  = registrations.filter(r => r.status === 'waiting' || r.status === 'called').length
+  const active   = registrations.filter(r => !r.voided)
+  const total    = active.length
+  const served   = active.filter(r => !!r.served_at).length
+  const waiting  = total - served
   const pct      = total > 0 ? Math.round((served / total) * 100) : 0
   const currentBatch = settings?.current_batch ?? 0
 
   /* Wave breakdown */
   const waves = {}
-  registrations.forEach(r => {
+  active.forEach(r => {
     const b = r.batch_number ?? 0
     if (!waves[b]) waves[b] = { total: 0, served: 0 }
     waves[b].total++
-    if (r.status === 'served') waves[b].served++
+    if (r.served_at) waves[b].served++
   })
   const waveKeys = Object.keys(waves).map(Number).sort((a, b) => a - b)
 
