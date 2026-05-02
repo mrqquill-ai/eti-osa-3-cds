@@ -183,13 +183,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <a
-              href="/login"
-              className="text-xs font-semibold transition-colors"
-              style={{ color: 'rgba(255,255,255,0.7)' }}
-            >
-              Executive login →
-            </a>
           </div>
         </header>
       )}
