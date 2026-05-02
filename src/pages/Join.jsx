@@ -77,30 +77,34 @@ export default function Join() {
     venue_radius_m: DEFAULT_RADIUS_METERS,
   })
 
-  // Poll registration status + geo settings
-  useEffect(() => {
-    async function check() {
-      try {
-        const { data } = await supabase
-          .from('session_settings')
-          .select('registration_open, geofencing_enabled, venue_lat, venue_lng, venue_radius_m')
-          .eq('id', 1)
-          .single()
-        if (data) {
-          setRegistrationOpen(data.registration_open)
-          setGeoSettings({
-            geofencing_enabled: data.geofencing_enabled ?? true,
-            venue_lat:          data.venue_lat          ?? DEFAULT_VENUE_LAT,
-            venue_lng:          data.venue_lng          ?? DEFAULT_VENUE_LNG,
-            venue_radius_m:     data.venue_radius_m     ?? DEFAULT_RADIUS_METERS,
-          })
-        }
-      } catch {}
-    }
-    check()
-    const interval = setInterval(check, 30000)
-    return () => clearInterval(interval)
+  // Fetch latest settings from DB (used on mount, polling, and manual recheck)
+  const fetchSettings = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('session_settings')
+        .select('registration_open, geofencing_enabled, venue_lat, venue_lng, venue_radius_m')
+        .eq('id', 1)
+        .single()
+      if (data) {
+        setRegistrationOpen(data.registration_open)
+        setGeoSettings({
+          geofencing_enabled: data.geofencing_enabled ?? true,
+          venue_lat:          data.venue_lat          ?? DEFAULT_VENUE_LAT,
+          venue_lng:          data.venue_lng          ?? DEFAULT_VENUE_LNG,
+          venue_radius_m:     data.venue_radius_m     ?? DEFAULT_RADIUS_METERS,
+        })
+        return data
+      }
+    } catch {}
+    return null
   }, [])
+
+  // Poll registration status + geo settings every 30s
+  useEffect(() => {
+    fetchSettings()
+    const interval = setInterval(fetchSettings, 30000)
+    return () => clearInterval(interval)
+  }, [fetchSettings])
 
   // Geolocation check — uses live settings from DB
   const checkLocation = useCallback(() => {
@@ -367,7 +371,7 @@ export default function Join() {
           </p>
         )}
         <button
-          onClick={checkLocation}
+          onClick={async () => { await fetchSettings(); checkLocation() }}
           disabled={recheckingGeo}
           className="mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-xl"
         >

@@ -417,7 +417,7 @@ export default function SettingsPage() {
         <SettingsRow
           icon={MapPin}
           title="Update Venue Location"
-          subtitle="Set the venue coordinates and allowed radius"
+          subtitle={settings?.venue_lat ? `${Number(settings.venue_lat).toFixed(4)}, ${Number(settings.venue_lng).toFixed(4)} · ${settings.venue_radius_m}m radius` : 'Set the venue coordinates and allowed radius'}
           onClick={() => {
             if (settings) {
               setVenueLat(String(settings.venue_lat ?? '6.4360344'))
