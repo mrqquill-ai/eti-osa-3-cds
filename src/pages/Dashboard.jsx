@@ -906,35 +906,38 @@ export default function Dashboard() {
       )}
 
       {/* ── Heading ── */}
-      <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-xl font-bold" style={{ color: '#1A1A1A' }}>Dashboard</h1>
-        {isSuperAdmin && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
-            <ShieldCheck className="w-3 h-3" /> Super Admin
-          </span>
-        )}
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold" style={{ color: '#0F172A' }}>Dashboard</h1>
+          {isSuperAdmin && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
+              <ShieldCheck className="w-3 h-3" /> Super Admin
+            </span>
+          )}
+        </div>
+        <p className="text-xs font-medium" style={{ color: '#64748B' }}>Eti-Osa 3 Special CDS</p>
       </div>
 
       {/* ── Status chips ── */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-4 pb-0.5">
-        <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#1A1A1A' }}>
+        <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}>
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F59B0A' }} />
           Wave {settings?.batch_size ?? '—'}
         </span>
         <span
           className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
-          style={{ border: '1px solid #E0DDD6', color: settings?.registration_open ? '#1B6B3A' : '#8C8880' }}
+          style={{ border: '1px solid #E0DDD6', color: settings?.registration_open ? '#1B6B3A' : '#64748B' }}
         >
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: settings?.registration_open ? '#1B6B3A' : '#8C8880' }} />
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: settings?.registration_open ? '#1B6B3A' : '#64748B' }} />
           {settings?.registration_open ? 'Reg. open' : 'Reg. closed'}
         </span>
         <button
           onClick={toggleGeofencing}
           disabled={busy || !settings}
           className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white transition-opacity disabled:opacity-50"
-          style={{ border: '1px solid #E0DDD6', color: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#8C8880' }}
+          style={{ border: '1px solid #E0DDD6', color: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#64748B' }}
         >
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#8C8880' }} />
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#64748B' }} />
           Location: {(settings?.geofencing_enabled ?? true) ? 'ON' : 'OFF'}
         </button>
       </div>
@@ -967,7 +970,7 @@ export default function Dashboard() {
       </button>
 
       {/* ── Segmented control ── */}
-      <div className="flex mb-4 p-0.5 rounded-xl" style={{ backgroundColor: '#E0DDD6' }}>
+      <div className="flex mb-4 p-0.5 rounded-xl" style={{ backgroundColor: '#E2E8F0' }}>
         {[{ key: 'live', label: 'Live' }, { key: 'queue', label: 'Queue' }].map(({ key, label }) => (
           <button
             key={key}
@@ -975,7 +978,7 @@ export default function Dashboard() {
             className="flex-1 py-2 text-sm font-semibold rounded-[10px] transition-all"
             style={{
               backgroundColor: dashTab === key ? 'white' : 'transparent',
-              color: dashTab === key ? '#1A1A1A' : '#8C8880',
+              color: dashTab === key ? '#0F172A' : '#64748B',
               boxShadow: dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}
           >
@@ -990,12 +993,12 @@ export default function Dashboard() {
 
           {/* Now Serving card */}
           <div className="bg-white rounded-xl px-4 py-4" style={{ border: '1px solid #E0DDD6', borderLeft: '4px solid #F59B0A' }}>
-            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Now Serving</div>
-            <div className="text-5xl font-extrabold leading-none" style={{ color: '#1A1A1A' }}>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Now Serving</div>
+            <div className="text-5xl font-extrabold leading-none" style={{ color: '#0F172A' }}>
               {settings?.current_batch ? `Wave ${settings.current_batch}` : '—'}
             </div>
             {currentWaveProgress && (
-              <div className="text-sm font-semibold mt-2" style={{ color: '#8C8880' }}>
+              <div className="text-sm font-semibold mt-2" style={{ color: '#64748B' }}>
                 {currentWaveProgress.served}/{currentWaveProgress.total} served in this wave
               </div>
             )}
@@ -1018,7 +1021,7 @@ export default function Dashboard() {
                 <span className="text-white font-bold text-sm">Super Admin</span>
               </div>
               <div className="px-4 py-6 text-center bg-white">
-                <p className="text-sm font-medium" style={{ color: '#8C8880' }}>Advanced controls coming soon.</p>
+                <p className="text-sm font-medium" style={{ color: '#64748B' }}>Advanced controls coming soon.</p>
               </div>
             </div>
           )}
@@ -1030,20 +1033,20 @@ export default function Dashboard() {
         <div>
           {/* Search */}
           <div className="relative mb-3">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#8C8880' }} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
               placeholder="Search by name or state code…"
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
-              style={{ border: '1px solid #E0DDD6', color: '#1A1A1A' }}
+              style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
               onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
-              onBlur={e => { e.target.style.borderColor = '#E0DDD6'; e.target.style.boxShadow = 'none' }}
+              onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none' }}
             />
           </div>
 
-          <div className="text-xs font-medium mb-2" style={{ color: '#8C8880' }}>
+          <div className="text-xs font-medium mb-2" style={{ color: '#64748B' }}>
             {searchQuery
               ? `${filteredAndSortedRows.length} of ${rows.length} members`
               : `${rows.length} members total`}
@@ -1052,17 +1055,17 @@ export default function Dashboard() {
           {/* List */}
           <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E0DDD6' }}>
             {filteredAndSortedRows.length === 0 && (
-              <div className="py-12 text-center text-sm" style={{ color: '#8C8880' }}>
+              <div className="py-12 text-center text-sm" style={{ color: '#64748B' }}>
                 {searchQuery ? 'No members found.' : 'No registrations yet.'}
               </div>
             )}
-            <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
+            <div className="divide-y" style={{ borderColor: '#E2E8F0' }}>
               {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
                 <div key={r.id}>
                   {/* Row */}
                   <div
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors active:opacity-70"
-                    style={{ backgroundColor: expandedRow === r.id ? '#F9F6F0' : 'white' }}
+                    style={{ backgroundColor: expandedRow === r.id ? '#F8FAFC' : 'white' }}
                     onClick={() => setExpandedRow(expandedRow === r.id ? null : r.id)}
                   >
                     <div
@@ -1074,11 +1077,11 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <div
                         className={`text-sm font-semibold truncate ${r.voided ? 'line-through opacity-50' : ''}`}
-                        style={{ color: '#1A1A1A' }}
+                        style={{ color: '#0F172A' }}
                       >
                         {r.full_name}
                       </div>
-                      <div className="text-xs font-mono mt-0.5" style={{ color: '#8C8880' }}>
+                      <div className="text-xs font-mono mt-0.5" style={{ color: '#64748B' }}>
                         {r.state_code}
                       </div>
                     </div>
@@ -1092,17 +1095,17 @@ export default function Dashboard() {
 
                   {/* Expanded panel */}
                   {expandedRow === r.id && (
-                    <div className="px-4 py-4" style={{ backgroundColor: '#F9F6F0', borderTop: '1px solid #E0DDD6' }}>
+                    <div className="px-4 py-4" style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E0DDD6' }}>
                       <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                         <div>
-                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Status</div>
-                          <div className="font-bold" style={{ color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#8C8880' }}>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Status</div>
+                          <div className="font-bold" style={{ color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#64748B' }}>
                             {r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}
                           </div>
                         </div>
                         <div>
-                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>Registered</div>
-                          <div className="font-medium" style={{ color: '#1A1A1A' }}>{formatTime(r.registered_at)}</div>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Registered</div>
+                          <div className="font-medium" style={{ color: '#0F172A' }}>{formatTime(r.registered_at)}</div>
                         </div>
                       </div>
                       {!r.voided && (
@@ -1164,7 +1167,7 @@ export default function Dashboard() {
 
           {/* Pagination */}
           {filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: '#8C8880' }}>
+            <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: '#64748B' }}>
               <button
                 onClick={() => setTablePage(p => Math.max(0, p - 1))}
                 disabled={tablePage === 0}
@@ -1189,7 +1192,7 @@ export default function Dashboard() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: '#1A1A1A' }}>
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: '#0F172A' }}>
           {toast}
         </div>
       )}
@@ -1673,8 +1676,8 @@ function LiveStatCard({ label, value, fullWidth }) {
       className={`bg-white rounded-xl px-4 py-4 ${fullWidth ? 'col-span-2' : ''}`}
       style={{ border: '1px solid #E0DDD6' }}
     >
-      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#8C8880' }}>{label}</div>
-      <div className="text-4xl font-extrabold leading-none" style={{ color: '#1A1A1A' }}>{value}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>{label}</div>
+      <div className="text-4xl font-extrabold leading-none" style={{ color: '#0F172A' }}>{value}</div>
     </div>
   )
 }

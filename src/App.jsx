@@ -161,44 +161,36 @@ export default function App() {
             className="fixed left-0 right-0 z-40 bg-white"
             style={{ top: '52px', borderBottom: '1px solid #E0DDD6' }}
           >
-            {/* Row 1: session name + open/closed badge */}
+            {/* Session name + open/closed badge + copy link */}
             <div className="flex items-center justify-between gap-3 px-4 h-11">
               <span className="text-sm font-semibold truncate" style={{ color: '#1A1A1A' }}>
                 Eti-Osa 3 Special CDS
               </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: sessionOpen ? G : '#8C8880' }}
-                />
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: sessionOpen ? G : '#8C8880' }}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: sessionOpen ? G : '#8C8880' }}
+                  />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: sessionOpen ? G : '#8C8880' }}
+                  >
+                    {sessionOpen ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+                <button
+                  onClick={copyLink}
+                  aria-label="Copy check-in link"
+                  className="flex-shrink-0 transition-colors"
+                  style={{ color: '#8C8880' }}
                 >
-                  {sessionOpen ? 'Session open' : 'Session closed'}
-                </span>
+                  {copied
+                    ? <span className="text-xs font-semibold" style={{ color: G }}>Copied!</span>
+                    : <Copy className="w-4 h-4" />
+                  }
+                </button>
               </div>
-            </div>
-
-            {/* Row 2: check-in link + copy */}
-            <div className="flex items-center gap-2 px-4 pb-2.5">
-              <span
-                className="text-xs truncate flex-1 font-mono"
-                style={{ color: '#8C8880' }}
-              >
-                {checkInUrl}
-              </span>
-              <button
-                onClick={copyLink}
-                aria-label="Copy check-in link"
-                className="flex-shrink-0 transition-colors"
-                style={{ color: '#8C8880' }}
-              >
-                {copied
-                  ? <span className="text-xs font-semibold" style={{ color: G }}>Copied!</span>
-                  : <Copy className="w-4 h-4" />
-                }
-              </button>
             </div>
           </div>
         </>
@@ -234,7 +226,7 @@ export default function App() {
       )}
 
       {/* ── Page content ── */}
-      <main className={`flex-1 ${isExecPage ? 'pt-[136px] pb-[72px]' : ''}`}>
+      <main className={`flex-1 ${isExecPage ? 'pt-[96px] pb-[72px]' : ''}`}>
         <Outlet />
       </main>
 
