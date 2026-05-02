@@ -146,23 +146,36 @@ export default function SettingsPage() {
   /* ── Actions ── */
   async function toggleRegistration() {
     setBusy(true); setError('')
+    const newVal = !settings?.registration_open
+    // Optimistic update
+    setSettings(prev => ({ ...prev, registration_open: newVal }))
     try {
       const { error: e } = await supabase.rpc('admin_toggle_registration', { p_pin: adminPin })
       if (e) throw e
-      flash(settings?.registration_open ? 'Session closed.' : 'Session opened.')
+      flash(newVal ? 'Session opened.' : 'Session closed.')
       closeSheet()
-    } catch (e) { setError(e.message || 'Could not update session.') }
+    } catch (e) {
+      // Revert on failure
+      setSettings(prev => ({ ...prev, registration_open: !newVal }))
+      setError(e.message || 'Could not update session.')
+    }
     finally { setBusy(false) }
   }
 
   async function toggleGeofencing() {
     setBusy(true); setError('')
+    const newVal = !(settings?.geofencing_enabled ?? true)
+    // Optimistic update — flip the UI immediately so toggle feels instant
+    setSettings(prev => ({ ...prev, geofencing_enabled: newVal }))
     try {
-      const newVal = !(settings?.geofencing_enabled ?? true)
       const { error: e } = await supabase.from('session_settings').update({ geofencing_enabled: newVal }).eq('id', 1)
       if (e) throw e
       flash(newVal ? 'Location check enabled.' : 'Location check disabled.')
-    } catch (e) { setError(e.message || 'Could not update.') }
+    } catch (e) {
+      // Revert on failure
+      setSettings(prev => ({ ...prev, geofencing_enabled: !newVal }))
+      setError(e.message || 'Could not update.')
+    }
     finally { setBusy(false) }
   }
 
