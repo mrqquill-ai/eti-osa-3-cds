@@ -287,7 +287,7 @@ export default function SettingsPage() {
 
   /* ─────────────── RENDER ─────────────── */
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+    <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 lg:max-w-3xl lg:px-8 lg:py-8">
 
       <h1 className="text-xl font-bold" style={{ color: INK }}>Settings</h1>
 

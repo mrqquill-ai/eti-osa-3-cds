@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.exec_profiles (
 ALTER TABLE public.exec_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated users can read their own profile
+DROP POLICY IF EXISTS "exec read own profile" ON public.exec_profiles;
 CREATE POLICY "exec read own profile" ON public.exec_profiles
   FOR SELECT TO authenticated
   USING (auth.uid() = id);

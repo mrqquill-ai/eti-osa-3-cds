@@ -924,7 +924,12 @@ export default function Dashboard() {
 
   // ── Main dashboard ─────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className="lg:flex lg:h-screen lg:overflow-hidden">
+
+    {/* ══ DESKTOP two-column wrapper ══ */}
+    {/* Left column — controls & live view */}
+    <div className="lg:flex-1 lg:overflow-y-auto lg:border-r" style={{ borderColor: '#E0DDD6' }}>
+    <div className="max-w-2xl mx-auto px-4 py-4 lg:max-w-none lg:px-6 lg:py-5">
 
       {/* ── Error banner ── */}
       {error && (
@@ -1033,8 +1038,8 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* ── Segmented control ── */}
-      <div className="flex mb-4 p-0.5 rounded-xl" style={{ backgroundColor: '#E2E8F0' }}>
+      {/* ── Segmented control — mobile only ── */}
+      <div className="flex mb-4 p-0.5 rounded-xl lg:hidden" style={{ backgroundColor: '#E2E8F0' }}>
         {[{ key: 'live', label: 'Live' }, { key: 'queue', label: 'Queue' }].map(({ key, label }) => (
           <button
             key={key}
@@ -1051,9 +1056,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ═══ LIVE TAB ═══ */}
-      {dashTab === 'live' && (
-        <div className="space-y-3">
+      {/* ═══ LIVE TAB (mobile) / always shown on desktop ═══ */}
+      {(dashTab === 'live' || true) && (
+        <div className={`space-y-3 ${dashTab !== 'live' ? 'hidden lg:block' : ''}`}>
 
           {/* Now Serving card */}
           <div className="bg-white rounded-xl px-4 py-4" style={{ border: '1px solid #E0DDD6', borderLeft: '4px solid #F59B0A' }}>
@@ -1296,9 +1301,16 @@ export default function Dashboard() {
         </div>
       )}
 
+    </div>
+    </div>
+
+    {/* ══ RIGHT COLUMN — Queue (desktop always visible, mobile tab) ══ */}
+    <div className={`lg:w-[420px] lg:flex-shrink-0 lg:flex lg:flex-col lg:overflow-hidden ${dashTab !== 'queue' ? 'hidden lg:flex' : ''}`}>
+    <div className="lg:flex-1 lg:overflow-y-auto">
+
       {/* ═══ QUEUE TAB ═══ */}
-      {dashTab === 'queue' && (
-        <div>
+      {(dashTab === 'queue' || true) && (
+        <div className="px-4 py-4 lg:px-5 lg:py-5">
           {/* Search */}
           <div className="relative mb-3">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
@@ -1457,6 +1469,9 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+    </div>
+    </div>
 
       {/* ── Toast ── */}
       {toast && (
@@ -1933,6 +1948,7 @@ export default function Dashboard() {
           </div>
         </Modal>
       )}
+
     </div>
   )
 }
