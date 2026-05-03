@@ -144,11 +144,24 @@ export default function Dashboard() {
       const detectedRole = meta.role === 'super_admin' ? 'super_admin' : 'executive'
       setRole(detectedRole)
 
-      // Auto-fetch the exec PIN so all RPCs work without manual PIN entry
+      // Auto-fetch the correct PIN for this role:
+      // - Super admin needs the super_pin for all super admin RPCs
+      // - Regular execs need the exec pin
       try {
-        const { data: execPin } = await supabase.rpc('get_exec_pin')
-        if (execPin) setAdminPin(execPin)
-      } catch { /* get_exec_pin migration not yet run — PIN stays empty */ }
+        if (detectedRole === 'super_admin') {
+          const { data: superPin } = await supabase.rpc('get_super_pin')
+          if (superPin) setAdminPin(superPin)
+        } else {
+          const { data: execPin } = await supabase.rpc('get_exec_pin')
+          if (execPin) setAdminPin(execPin)
+        }
+      } catch {
+        // Fallback: try exec pin
+        try {
+          const { data: execPin } = await supabase.rpc('get_exec_pin')
+          if (execPin) setAdminPin(execPin)
+        } catch {}
+      }
 
       setUnlocked(true)
       setSessionChecked(true)
