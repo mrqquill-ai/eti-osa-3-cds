@@ -18,8 +18,27 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
       if (authErr) throw authErr
+
+      // Super admins always go straight to the dashboard
+      const role = authData?.user?.user_metadata?.role
+      if (role === 'super_admin') {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+
+      // Check approval status for all other users
+      try {
+        const { data: profile } = await supabase.rpc('get_my_exec_profile')
+        if (profile?.status === 'pending' || profile?.status === 'rejected') {
+          navigate('/pending-approval', { replace: true })
+          return
+        }
+      } catch {
+        // If RPC not available yet (migration not run), fall through to dashboard
+      }
+
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err.message === 'Invalid login credentials'
@@ -133,10 +152,17 @@ export default function Login() {
         </button>
       </form>
 
-      {/* Contact admin note */}
+      {/* Sign up link */}
       <div className="mt-7 pt-6 border-t border-slate-100 text-center">
         <p className="text-xs text-slate-400">
-          Need access? Contact your CDS coordinator.
+          No account yet?{' '}
+          <Link
+            to="/signup"
+            className="font-semibold transition-colors hover:underline"
+            style={{ color: G }}
+          >
+            Request access
+          </Link>
         </p>
       </div>
     </div>

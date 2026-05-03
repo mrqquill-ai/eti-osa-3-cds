@@ -313,10 +313,22 @@ function MobileTopBar() {
 export default function AuthLayout() {
   const navigate = useNavigate()
 
-  // Already logged in? Skip straight to the dashboard
+  // Already logged in? Check approval status and route accordingly
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/dashboard', { replace: true })
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return
+      const role = session.user?.user_metadata?.role
+      if (role === 'super_admin') { navigate('/dashboard', { replace: true }); return }
+      try {
+        const { data: profile } = await supabase.rpc('get_my_exec_profile')
+        if (profile?.status === 'pending' || profile?.status === 'rejected') {
+          navigate('/pending-approval', { replace: true })
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
+      } catch {
+        navigate('/dashboard', { replace: true })
+      }
     })
   }, [navigate])
 

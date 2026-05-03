@@ -59,7 +59,14 @@ export default function Dashboard() {
   const [forceExecPin, setForceExecPin] = useState('')
 
   // Super admin panel
-  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'log','stats','announce','sessions','archives','duplicates','venue'
+  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'approvals','log','stats','announce','sessions','archives','duplicates','venue'
+  // Exec approvals
+  const [execList,          setExecList]          = useState([])
+  const [execListLoading,   setExecListLoading]   = useState(false)
+  const [approvingId,       setApprovingId]       = useState(null)
+  const [rejectingId,       setRejectingId]       = useState(null)
+  const [rejectReason,      setRejectReason]      = useState('')
+  const [showRejectSheet,   setShowRejectSheet]   = useState(null) // user_id string | null
   const [activityLog, setActivityLog] = useState([])
   const [logLoading, setLogLoading] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -564,6 +571,36 @@ export default function Dashboard() {
   }
 
   // ── Super Admin panel loaders ────────────────────────────
+  async function loadExecList() {
+    setExecListLoading(true)
+    try {
+      const { data } = await supabase.rpc('super_admin_list_execs', { p_super_pin: adminPin })
+      if (data) setExecList(data)
+    } catch (e) { showError(e) } finally { setExecListLoading(false) }
+  }
+
+  async function approveExec(userId) {
+    setApprovingId(userId)
+    try {
+      const { error: e } = await supabase.rpc('super_admin_approve_exec', { p_super_pin: adminPin, p_user_id: userId })
+      if (e) throw e
+      setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'approved', reviewed_at: new Date().toISOString(), rejection_reason: null } : p))
+      flash('Access approved.')
+    } catch (e) { showError(e) } finally { setApprovingId(null) }
+  }
+
+  async function rejectExec(userId) {
+    setRejectingId(userId)
+    try {
+      const { error: e } = await supabase.rpc('super_admin_reject_exec', { p_super_pin: adminPin, p_user_id: userId, p_reason: rejectReason.trim() })
+      if (e) throw e
+      setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'rejected', reviewed_at: new Date().toISOString(), rejection_reason: rejectReason.trim() } : p))
+      flash('Access rejected.')
+      setShowRejectSheet(null)
+      setRejectReason('')
+    } catch (e) { showError(e) } finally { setRejectingId(null) }
+  }
+
   async function loadActivityLog() {
     setLogLoading(true)
     try {
@@ -782,6 +819,7 @@ export default function Dashboard() {
   // Load super admin panel data when tab changes
   useEffect(() => {
     if (!isSuperAdmin || !superTab) return
+    if (superTab === 'approvals') loadExecList()
     if (superTab === 'log') loadActivityLog()
     if (superTab === 'sessions') loadExecSessions()
     if (superTab === 'archives') loadArchiveDates()
@@ -1029,12 +1067,216 @@ export default function Dashboard() {
           {/* Super Admin stub */}
           {isSuperAdmin && (
             <div className="rounded-xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
-              <div className="px-4 py-3 flex items-center gap-2" style={{ backgroundColor: '#1B6B3A' }}>
-                <ShieldCheck className="w-4 h-4 text-white" />
-                <span className="text-white font-bold text-sm">Super Admin</span>
+              {/* Super admin header */}
+              <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#1B6B3A' }}>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-white" />
+                  <span className="text-white font-bold text-sm">Super Admin</span>
+                </div>
+                {superTab && (
+                  <button
+                    onClick={() => setSuperTab(null)}
+                    className="text-white text-xs font-semibold opacity-80 hover:opacity-100"
+                  >
+                    ✕ Close
+                  </button>
+                )}
               </div>
-              <div className="px-4 py-6 text-center bg-white">
-                <p className="text-sm font-medium" style={{ color: '#64748B' }}>Advanced controls coming soon.</p>
+
+              {/* Tab pills */}
+              <div className="flex gap-1.5 flex-wrap px-3 py-2.5 bg-white" style={{ borderBottom: '1px solid #E0DDD6' }}>
+                {[
+                  { key: 'approvals', label: '👤 Approvals' },
+                  { key: 'announce',  label: '📢 Announce'  },
+                  { key: 'log',       label: '📋 Activity'  },
+                  { key: 'sessions',  label: '🔑 Sessions'  },
+                  { key: 'archives',  label: '🗄 Archives'  },
+                  { key: 'duplicates',label: '⚠️ Duplicates'},
+                  { key: 'venue',     label: '📍 Venue'     },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSuperTab(superTab === key ? null : key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                    style={{
+                      backgroundColor: superTab === key ? '#1B6B3A' : '#F1F5F9',
+                      color:           superTab === key ? 'white'   : '#475569',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Approvals panel ── */}
+              {superTab === 'approvals' && (
+                <div className="bg-white">
+                  <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Exec Access Requests</span>
+                    <button onClick={loadExecList} disabled={execListLoading} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>
+                      {execListLoading ? 'Loading…' : 'Refresh'}
+                    </button>
+                  </div>
+
+                  {execListLoading && (
+                    <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>Loading…</div>
+                  )}
+
+                  {!execListLoading && execList.length === 0 && (
+                    <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>No exec accounts found.</div>
+                  )}
+
+                  {!execListLoading && execList.length > 0 && (
+                    <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
+                      {execList.map(p => (
+                        <div key={p.id} className="px-4 py-3">
+                          <div className="flex items-start gap-3">
+                            {/* Avatar */}
+                            <div
+                              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  p.status === 'approved' ? 'rgba(27,107,58,0.12)' :
+                                  p.status === 'rejected' ? 'rgba(192,57,43,0.1)'  :
+                                  'rgba(201,151,58,0.15)',
+                                color:
+                                  p.status === 'approved' ? '#1B6B3A' :
+                                  p.status === 'rejected' ? '#C0392B' :
+                                  '#A67C2E',
+                              }}
+                            >
+                              {(p.full_name || p.email || '?')[0].toUpperCase()}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>
+                                  {p.full_name || '(no name)'}
+                                </span>
+                                {/* Status badge */}
+                                <span
+                                  className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+                                  style={{
+                                    backgroundColor:
+                                      p.status === 'approved' ? 'rgba(27,107,58,0.1)'  :
+                                      p.status === 'rejected' ? 'rgba(192,57,43,0.1)'  :
+                                      'rgba(201,151,58,0.15)',
+                                    color:
+                                      p.status === 'approved' ? '#1B6B3A' :
+                                      p.status === 'rejected' ? '#C0392B' :
+                                      '#A67C2E',
+                                  }}
+                                >
+                                  {p.status}
+                                </span>
+                              </div>
+                              <div className="text-xs mt-0.5 truncate" style={{ color: '#64748B' }}>{p.email}</div>
+                              <div className="text-xs mt-0.5 font-mono" style={{ color: '#94A3B8' }}>
+                                {p.state_code || '—'} · {p.role}
+                              </div>
+                              {p.rejection_reason && (
+                                <div className="text-xs mt-1 italic" style={{ color: '#C0392B' }}>
+                                  Reason: {p.rejection_reason}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action buttons */}
+                          {p.status === 'pending' && (
+                            <div className="flex gap-2 mt-2.5 pl-12">
+                              <button
+                                onClick={() => approveExec(p.id)}
+                                disabled={approvingId === p.id || rejectingId === p.id}
+                                className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: '#1B6B3A' }}
+                              >
+                                {approvingId === p.id ? 'Approving…' : '✓ Approve'}
+                              </button>
+                              <button
+                                onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }}
+                                disabled={approvingId === p.id || rejectingId === p.id}
+                                className="flex-1 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
+                              >
+                                ✕ Reject
+                              </button>
+                            </div>
+                          )}
+
+                          {p.status === 'approved' && (
+                            <div className="flex gap-2 mt-2.5 pl-12">
+                              <button
+                                onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }}
+                                disabled={rejectingId === p.id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(192,57,43,0.07)', color: '#C0392B' }}
+                              >
+                                Revoke access
+                              </button>
+                            </div>
+                          )}
+
+                          {p.status === 'rejected' && (
+                            <div className="flex gap-2 mt-2.5 pl-12">
+                              <button
+                                onClick={() => approveExec(p.id)}
+                                disabled={approvingId === p.id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: '#1B6B3A' }}
+                              >
+                                {approvingId === p.id ? 'Approving…' : 'Reinstate'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Reject / Revoke sheet ── */}
+          {showRejectSheet && (
+            <div className="fixed inset-0 z-[100]">
+              <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRejectSheet(null)} />
+              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl px-5 pt-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+                <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-4" />
+                <h3 className="text-base font-bold mb-1" style={{ color: '#0F172A' }}>
+                  {execList.find(p => p.id === showRejectSheet)?.status === 'approved'
+                    ? 'Revoke access'
+                    : 'Reject access request'}
+                </h3>
+                <p className="text-sm mb-3" style={{ color: '#64748B' }}>
+                  Optional: give a reason (the exec will see this).
+                </p>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  placeholder="e.g. Not a registered exec for this CDS group."
+                  rows={3}
+                  className="w-full rounded-xl px-3.5 py-3 text-sm outline-none resize-none"
+                  style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }}
+                />
+                <div className="flex gap-3 mt-3">
+                  <button
+                    onClick={() => setShowRejectSheet(null)}
+                    className="flex-1 py-3 rounded-xl text-sm font-semibold border"
+                    style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => rejectExec(showRejectSheet)}
+                    disabled={rejectingId === showRejectSheet}
+                    className="flex-1 py-3 rounded-xl text-sm font-bold disabled:opacity-50"
+                    style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B', border: '1px solid #C0392B' }}
+                  >
+                    {rejectingId === showRejectSheet ? 'Please wait…' : 'Confirm reject'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
