@@ -148,8 +148,13 @@ export default function Join() {
     )
   }, []) // no deps — reads from ref, always fresh
 
-  // Run location check on mount (after initial fetchSettings populates the ref)
-  useEffect(() => { checkLocation() }, [checkLocation])
+  // Run location check on mount — fetchSettings must resolve first so geoSettingsRef
+  // has the real DB venue coords before checkLocation reads them.
+  // Without the await, checkLocation fires before fetchSettings returns and uses the
+  // hardcoded defaults, causing a false "too far" on every page load / refresh.
+  useEffect(() => {
+    fetchSettings().then(() => checkLocation())
+  }, [fetchSettings, checkLocation])
 
   // Lookup existing registration
   async function handleLookup() {
