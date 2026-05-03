@@ -128,7 +128,7 @@ export default function Dashboard() {
   const [pinLockUntil, setPinLockUntil] = useState(0)
   const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
   const [newBatchSize, setNewBatchSize] = useState(30)
-  const [dashTab, setDashTab] = useState('live')
+  const [dashTab, setDashTab] = useState('wave')
   const [expandedRow, setExpandedRow] = useState(null)
 
   // ── Auth: check session on mount, redirect to /login if missing ──
@@ -350,6 +350,32 @@ export default function Dashboard() {
       return 0
     })
   }, [rows, searchQuery, sortKey, sortDir])
+
+  // ── Tab-filtered rows ─────────────────────────────────
+  const currentWave = settings?.current_batch ?? 0
+
+  // "This Wave" — only non-voided rows in the active wave
+  const waveFilteredRows = useMemo(() => {
+    if (currentWave <= 0) return filteredAndSortedRows
+    return filteredAndSortedRows.filter(r => !r.voided && r.batch_number === currentWave)
+  }, [filteredAndSortedRows, currentWave])
+
+  // "Served" — only served rows, most-recently-served first
+  const servedFilteredRows = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim()
+    return rows
+      .filter(r => !r.voided && !!r.served_at && (
+        !q || r.full_name.toLowerCase().includes(q) || r.state_code.toLowerCase().includes(q)
+      ))
+      .sort((a, b) => new Date(b.served_at) - new Date(a.served_at))
+  }, [rows, searchQuery])
+
+  // rows shown in the active tab
+  const activeRows = dashTab === 'wave'
+    ? waveFilteredRows
+    : dashTab === 'served'
+      ? servedFilteredRows
+      : filteredAndSortedRows
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -1109,52 +1135,54 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* ── Segmented control — mobile only ── */}
-      <div className="flex mb-4 p-0.5 rounded-xl lg:hidden" style={{ backgroundColor: '#E2E8F0' }}>
-        {[{ key: 'live', label: 'Live' }, { key: 'queue', label: 'Queue' }].map(({ key, label }) => (
+      {/* ── Mobile always-visible stats strip ── */}
+      <div className="lg:hidden grid grid-cols-4 gap-2 mb-3">
+        {[
+          { label: 'Wave',       value: currentWave > 0 ? `W${currentWave}` : '—', color: '#92400E', bg: 'rgba(245,155,10,0.08)' },
+          { label: 'Registered', value: counts.registered, color: '#1B6B3A',  bg: 'rgba(27,107,58,0.06)'  },
+          { label: 'Waiting',    value: counts.waiting,    color: '#1D4ED8',  bg: 'rgba(29,78,216,0.06)'  },
+          { label: 'Served',     value: counts.served,     color: '#166534',  bg: 'rgba(22,101,52,0.06)'  },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className="rounded-xl px-2 py-2 text-center" style={{ backgroundColor: bg, border: '1px solid rgba(0,0,0,0.06)' }}>
+            <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: '#94A3B8' }}>{label}</p>
+            <p className="text-base font-extrabold leading-tight" style={{ color }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── 3-tab segmented control — mobile only ── */}
+      <div className="flex mb-3 p-0.5 rounded-xl lg:hidden" style={{ backgroundColor: '#E2E8F0' }}>
+        {[
+          { key: 'all',    label: 'All',       count: counts.registered },
+          { key: 'wave',   label: 'This Wave', count: waveFilteredRows.length },
+          { key: 'served', label: 'Served',    count: counts.served },
+        ].map(({ key, label, count }) => (
           <button
             key={key}
             onClick={() => setDashTab(key)}
-            className="flex-1 py-2 text-sm font-semibold rounded-[10px] transition-all"
+            className="flex-1 py-2 text-xs font-semibold rounded-[10px] transition-all flex items-center justify-center gap-1"
             style={{
               backgroundColor: dashTab === key ? 'white' : 'transparent',
-              color: dashTab === key ? '#0F172A' : '#64748B',
-              boxShadow: dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              color:           dashTab === key ? '#0F172A' : '#64748B',
+              boxShadow:       dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}
           >
             {label}
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{
+                backgroundColor: dashTab === key ? '#E2E8F0' : 'transparent',
+                color:           dashTab === key ? '#475569' : '#94A3B8',
+              }}
+            >
+              {count}
+            </span>
           </button>
         ))}
       </div>
 
-      {/* ═══ LIVE TAB (mobile) / always shown on desktop ═══ */}
-      {(dashTab === 'live' || true) && (
-        <div className={`space-y-3 ${dashTab !== 'live' ? 'hidden lg:block' : ''}`}>
-
-          {/* Now Serving card — mobile only (desktop uses the 4-col strip above) */}
-          <div className="lg:hidden bg-white rounded-xl px-4 py-4" style={{ border: '1px solid #E0DDD6', borderLeft: '4px solid #F59B0A' }}>
-            <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Now Serving</div>
-            <div className="text-5xl font-extrabold leading-none" style={{ color: '#0F172A' }}>
-              {settings?.current_batch ? `Wave ${settings.current_batch}` : '—'}
-            </div>
-            {currentWaveProgress && (
-              <div className="text-sm font-semibold mt-2" style={{ color: '#64748B' }}>
-                {currentWaveProgress.served}/{currentWaveProgress.total} served in this wave
-              </div>
-            )}
-          </div>
-
-          {/* 2-col stats — mobile only */}
-          <div className="lg:hidden grid grid-cols-2 gap-3">
-            <LiveStatCard label="Registered" value={counts.registered} />
-            <LiveStatCard label="Waiting" value={counts.waiting} />
-          </div>
-
-          {/* Served full-width — mobile only */}
-          <div className="lg:hidden">
-            <LiveStatCard label="Served" value={counts.served} fullWidth />
-          </div>
-
+      {/* ═══ Super Admin panel — always visible ═══ */}
+      <div className="space-y-3">
           {/* Super Admin stub */}
           {isSuperAdmin && (
             <div className="rounded-xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
@@ -1372,11 +1400,23 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      )}
 
     {/* ══ Queue section ══ */}
-    <div className={dashTab !== 'queue' ? 'hidden lg:block' : ''}>
+    <div className="mt-0">
       <div>
+          {/* Wave progress bar — mobile only, This Wave tab */}
+          {dashTab === 'wave' && currentWave > 0 && currentWaveProgress && (
+            <div className="lg:hidden bg-white rounded-xl px-4 py-3 mb-3" style={{ border: '1px solid #E0DDD6' }}>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold" style={{ color: '#0F172A' }}>Wave {currentWave} progress</span>
+                <span className="text-xs font-semibold" style={{ color: '#64748B' }}>{currentWaveProgress.served} / {currentWaveProgress.total} served</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#E2E8F0' }}>
+                <div className="h-full rounded-full transition-all duration-500" style={{ backgroundColor: '#1B6B3A', width: `${currentWaveProgress.total > 0 ? Math.round((currentWaveProgress.served / currentWaveProgress.total) * 100) : 0}%` }} />
+              </div>
+            </div>
+          )}
+
           {/* Search — mobile only (desktop search is in the action bar above) */}
           <div className="lg:hidden relative mb-3">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
@@ -1384,7 +1424,7 @@ export default function Dashboard() {
               type="text"
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
-              placeholder="Search by name or state code…"
+              placeholder={dashTab === 'served' ? 'Verify a name or state code…' : 'Search by name or state code…'}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
               style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
               onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
@@ -1392,22 +1432,51 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Members count — mobile only (desktop shows this in the action bar) */}
+          {/* Members count — mobile only */}
           <div className="lg:hidden text-xs font-medium mb-2" style={{ color: '#64748B' }}>
-            {searchQuery
-              ? `${filteredAndSortedRows.length} of ${rows.length} members`
-              : `${rows.length} members total`}
+            {dashTab === 'served'
+              ? `${servedFilteredRows.length} cleared today`
+              : dashTab === 'wave'
+                ? `${waveFilteredRows.length} in Wave ${currentWave}`
+                : searchQuery
+                  ? `${filteredAndSortedRows.length} of ${rows.length} members`
+                  : `${rows.length} members total`}
           </div>
 
-          {/* List */}
-          <div className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E0DDD6' }}>
-            {filteredAndSortedRows.length === 0 && (
+          {/* ── Served tab: clean verification list ── */}
+          {dashTab === 'served' && (
+            <div className="lg:hidden bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E0DDD6' }}>
+              {servedFilteredRows.length === 0 ? (
+                <div className="py-12 text-center text-sm" style={{ color: '#64748B' }}>
+                  {searchQuery ? 'No matches found.' : 'No one has been served yet.'}
+                </div>
+              ) : servedFilteredRows.map(r => (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0" style={{ borderColor: '#E2E8F0' }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#DCFCE7' }}>
+                    <Check className="w-3.5 h-3.5" style={{ color: '#166534' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{r.full_name}</p>
+                    <p className="text-xs font-mono" style={{ color: '#94A3B8' }}>{r.state_code}</p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F1F5F9', color: '#64748B' }}>W{r.batch_number}</span>
+                  <span className="text-xs flex-shrink-0" style={{ color: '#94A3B8' }}>
+                    {new Date(r.served_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* List — All + This Wave tabs on mobile, always on desktop */}
+          <div className={`bg-white rounded-xl overflow-hidden ${dashTab === 'served' ? 'hidden lg:block' : ''}`} style={{ border: '1px solid #E0DDD6' }}>
+            {activeRows.length === 0 && (
               <div className="py-12 text-center text-sm" style={{ color: '#64748B' }}>
-                {searchQuery ? 'No members found.' : 'No registrations yet.'}
+                {searchQuery ? 'No members found.' : dashTab === 'wave' && currentWave <= 0 ? 'No wave called yet.' : 'No registrations yet.'}
               </div>
             )}
             {/* Desktop column headers */}
-            {filteredAndSortedRows.length > 0 && (
+            {activeRows.length > 0 && (
               <div className="hidden lg:flex items-center px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider" style={{ borderBottom: '1px solid #E2E8F0', color: '#94A3B8', backgroundColor: '#F8FAFC' }}>
                 <div className="w-12 flex-shrink-0 text-center">Q#</div>
                 <div className="flex-1 min-w-0 pl-3">Full Name</div>
@@ -1421,7 +1490,7 @@ export default function Dashboard() {
               </div>
             )}
             <div className="divide-y" style={{ borderColor: '#E2E8F0' }}>
-              {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
+              {activeRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
                 <div key={r.id}>
                   {/* Row — mobile: tap to expand | desktop: full-width table row */}
                   <div
