@@ -1339,22 +1339,42 @@ export default function Dashboard() {
                 {searchQuery ? 'No members found.' : 'No registrations yet.'}
               </div>
             )}
+            {/* Desktop column headers */}
+            {filteredAndSortedRows.length > 0 && (
+              <div className="hidden lg:flex items-center gap-3 px-4 py-2 text-[11px] font-bold uppercase tracking-wider" style={{ borderBottom: '1px solid #E2E8F0', color: '#94A3B8', backgroundColor: '#F8FAFC' }}>
+                <div className="w-10 flex-shrink-0 text-center">Q#</div>
+                <div className="flex-1 min-w-0">Name / Code</div>
+                <div className="flex-shrink-0 w-8">Wave</div>
+                <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+                  <span className="w-[60px] text-center">Status</span>
+                  <span className="w-[68px] text-right">Time</span>
+                  <span className="w-[52px] text-center">Served</span>
+                  <span className="w-[36px] text-center">Void</span>
+                  {isSuperAdmin && <span className="w-[52px] text-center">Edit</span>}
+                </div>
+              </div>
+            )}
             <div className="divide-y" style={{ borderColor: '#E2E8F0' }}>
               {filteredAndSortedRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
                 <div key={r.id}>
-                  {/* Row */}
+                  {/* Row — mobile: tap to expand | desktop: full inline row */}
                   <div
-                    className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors active:opacity-70"
+                    className="flex items-center gap-3 px-4 py-3 transition-colors"
                     style={{ backgroundColor: expandedRow === r.id ? '#F8FAFC' : 'white' }}
-                    onClick={() => setExpandedRow(expandedRow === r.id ? null : r.id)}
                   >
+                    {/* Q# badge */}
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
                       style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
                     >
                       {r.queue_number}
                     </div>
-                    <div className="flex-1 min-w-0">
+
+                    {/* Name + state code — tap area on mobile */}
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer lg:cursor-default"
+                      onClick={() => setExpandedRow(expandedRow === r.id ? null : r.id)}
+                    >
                       <div
                         className={`text-sm font-semibold truncate ${r.voided ? 'line-through opacity-50' : ''}`}
                         style={{ color: '#0F172A' }}
@@ -1365,17 +1385,105 @@ export default function Dashboard() {
                         {r.state_code}
                       </div>
                     </div>
+
+                    {/* Wave badge */}
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
                     >
                       W{r.batch_number}
                     </span>
+
+                    {/* ── DESKTOP ONLY: status badge + inline action buttons ── */}
+                    <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+                      {/* Status badge */}
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full min-w-[60px] text-center"
+                        style={{
+                          backgroundColor: r.voided
+                            ? 'rgba(192,57,43,0.08)'
+                            : r.served_at
+                              ? 'rgba(27,107,58,0.08)'
+                              : 'rgba(245,155,10,0.10)',
+                          color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#D97706',
+                        }}
+                      >
+                        {r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}
+                      </span>
+
+                      {/* Registered time */}
+                      <span className="text-xs w-[68px] text-right" style={{ color: '#94A3B8' }}>
+                        {formatTime(r.registered_at)}
+                      </span>
+
+                      {/* Actions */}
+                      {!r.voided && (
+                        <>
+                          <button
+                            onClick={() => toggleServed(r)}
+                            disabled={rowBusy === r.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
+                            style={{ backgroundColor: r.served_at ? '#F59B0A' : '#1B6B3A' }}
+                          >
+                            {rowBusy === r.id ? '…' : r.served_at ? 'Undo' : 'Served'}
+                          </button>
+                          <button
+                            onClick={() => setShowVoidConfirm(r)}
+                            disabled={rowBusy === r.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                            style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
+                          >
+                            Void
+                          </button>
+                          {isSuperAdmin && (
+                            <>
+                              <button
+                                onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
+                                disabled={rowBusy === r.id}
+                                className="p-1.5 rounded-lg transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                title="Edit"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => { setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
+                                disabled={rowBusy === r.id}
+                                className="p-1.5 rounded-lg transition-opacity disabled:opacity-40"
+                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                title="Move wave"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                      {r.voided && (
+                        <button
+                          onClick={() => toggleVoid(r)}
+                          disabled={rowBusy === r.id}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                          style={{ backgroundColor: 'rgba(245,155,10,0.1)', color: '#F59B0A' }}
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Mobile: chevron expand indicator */}
+                    <ChevronRight
+                      className="lg:hidden w-4 h-4 flex-shrink-0 transition-transform duration-200"
+                      style={{
+                        color: '#CBD5E1',
+                        transform: expandedRow === r.id ? 'rotate(90deg)' : 'none',
+                      }}
+                    />
                   </div>
 
-                  {/* Expanded panel */}
+                  {/* Expanded panel — mobile only */}
                   {expandedRow === r.id && (
-                    <div className="px-4 py-4" style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E0DDD6' }}>
+                    <div className="lg:hidden px-4 py-4" style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E0DDD6' }}>
                       <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                         <div>
                           <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Status</div>
