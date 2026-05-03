@@ -370,12 +370,14 @@ export default function Dashboard() {
       .sort((a, b) => new Date(b.served_at) - new Date(a.served_at))
   }, [rows, searchQuery])
 
-  // rows shown in the active tab
-  const activeRows = dashTab === 'wave'
-    ? waveFilteredRows
-    : dashTab === 'served'
-      ? servedFilteredRows
-      : filteredAndSortedRows
+  // rows shown in the active tab — desktop always shows all (tabs are mobile-only)
+  const activeRows = (typeof window !== 'undefined' && window.innerWidth >= 1024)
+    ? filteredAndSortedRows
+    : dashTab === 'wave'
+      ? waveFilteredRows
+      : dashTab === 'served'
+        ? servedFilteredRows
+        : filteredAndSortedRows
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
