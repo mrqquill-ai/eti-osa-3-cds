@@ -25,11 +25,11 @@ function ConfirmSheet({ title, body, confirmLabel, destructive = false, onCancel
       <div
         className={[
           /* shared */
-          'relative bg-white px-6 pt-5',
-          /* mobile: anchored to bottom */
+          'bg-white px-6 pt-5',
+          /* mobile: anchored to bottom, sits above scrim via DOM order */
           'absolute bottom-0 left-0 right-0 rounded-t-2xl',
-          /* desktop: centred card */
-          'lg:static lg:bottom-auto lg:left-auto lg:right-auto',
+          /* desktop: centred card, z-10 so it sits above the absolute scrim */
+          'lg:relative lg:z-10 lg:bottom-auto lg:left-auto lg:right-auto',
           'lg:rounded-2xl lg:max-w-md lg:w-full lg:shadow-2xl lg:pt-7 lg:pb-7',
         ].join(' ')}
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
