@@ -460,6 +460,29 @@ export default function Manager() {
               </button>
             </div>
 
+          {/* Check-in Link Card */}
+          <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
+            <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in Link</h2>
+            <p className="text-xs mb-4" style={{ color: MUTED }}>
+              Share this link or QR code with corps members so they can join the queue from their phones.
+            </p>
+
+            {/* QR Code */}
+            <div className="flex flex-col items-center gap-3">
+              <div
+                ref={linkQrRef}
+                className="p-3 rounded-2xl inline-block"
+                style={{ backgroundColor: '#fff', border: `1.5px solid ${LINE}`, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}
+              >
+                <QRCodeCanvas
+                  value={joinUrl}
+                  size={160}
+                  bgColor="#ffffff"
+                  fgColor={INK}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
               <button
                 onClick={downloadQR}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:opacity-70"
@@ -528,30 +551,6 @@ export default function Manager() {
               </div>
             )}
           </div>
-
-          {/* Check-in Link Card */}
-          <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
-            <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in Link</h2>
-            <p className="text-xs mb-4" style={{ color: MUTED }}>
-              Share this link or QR code with corps members so they can join the queue from their phones.
-            </p>
-
-            {/* QR Code */}
-            <div className="flex flex-col items-center gap-3">
-              <div
-                ref={linkQrRef}
-                className="p-3 rounded-2xl inline-block"
-                style={{ backgroundColor: '#fff', border: `1.5px solid ${LINE}`, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}
-              >
-                <QRCodeCanvas
-                  value={joinUrl}
-                  size={160}
-                  bgColor="#ffffff"
-                  fgColor={INK}
-                  level="M"
-                  includeMargin={false}
-                />
-              </div>
 
           {/* Recent (mobile only – desktop has live feed on right) */}
           {recentRegs.length > 0 && (
