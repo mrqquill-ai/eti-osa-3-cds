@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3-Tab Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #CBD5E1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 28px 16px; display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  .col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .label { font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .phone { width: 360px; background: #F1F5F9; border-radius: 36px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.28); }
+
+  .top-bar { background: #1B6B3A; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .top-bar-left { display: flex; align-items: center; gap: 8px; }
+  .shield { width: 32px; height: 32px; background: rgba(255,255,255,0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .shield svg { width: 16px; height: 16px; stroke: white; fill: none; stroke-width: 2.5; }
+  .app-name { color: white; font-weight: 700; font-size: 14px; }
+  .avatar { width: 36px; height: 36px; background: #A67C2E; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #1A1A1A; font-weight: 700; font-size: 13px; }
+
+  .session-bar { background: white; padding: 0 16px; height: 44px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E0DDD6; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #1B6B3A; }
+  .status-pill { display: flex; align-items: center; gap: 6px; }
+  .status-text { font-size: 12px; font-weight: 500; color: #1B6B3A; }
+
+  .content { padding: 12px; }
+
+  .btn-wave { width: 100%; background: #1B6B3A; color: white; border: none; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+  .wave-badge { background: rgba(255,255,255,0.25); border-radius: 20px; padding: 2px 9px; font-size: 12px; }
+  .btn-back { width: 100%; background: white; color: #334155; border: 1px solid #E2E8F0; border-radius: 14px; padding: 10px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 12px; }
+
+  /* ── 3-tab toggle ── */
+  .toggle-row { background: #E2E8F0; border-radius: 12px; padding: 4px; display: flex; gap: 2px; margin-bottom: 12px; }
+  .toggle-btn { flex: 1; padding: 8px 4px; border-radius: 9px; border: none; font-size: 12.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+  .toggle-btn.active { background: white; color: #0F172A; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
+  .toggle-btn.inactive { background: transparent; color: #64748B; }
+  .tab-count { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
+  .tc-green  { background: rgba(27,107,58,0.12);  color: #1B6B3A; }
+  .tc-amber  { background: rgba(245,155,10,0.15); color: #92400E; }
+  .tc-teal   { background: rgba(20,184,166,0.15); color: #0F766E; }
+  .tc-grey   { background: #D1D5DB; color: #6B7280; }
+
+  /* list */
+  .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .list-title { font-size: 13px; font-weight: 700; color: #0F172A; }
+  .list-sub { font-size: 12px; color: #64748B; background: #F1F5F9; border-radius: 20px; padding: 2px 8px; }
+  .search-bar { background: white; border: 1px solid #E2E8F0; border-radius: 10px; padding: 8px 12px; font-size: 13px; color: #94A3B8; margin-bottom: 8px; }
+
+  .wave-divider { display: flex; align-items: center; gap: 8px; margin: 8px 0 5px; }
+  .wave-divider-line { flex: 1; height: 1px; background: #E2E8F0; }
+  .wave-divider-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94A3B8; white-space: nowrap; }
+
+  .member-row { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+  .member-row.dimmed { opacity: 0.45; }
+  .q-num { width: 26px; height: 26px; background: #F1F5F9; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #475569; flex-shrink: 0; }
+  .q-num.served { background: #DCFCE7; color: #166534; }
+  .q-num.called { background: rgba(245,155,10,0.15); color: #92400E; }
+  .m-info { flex: 1; min-width: 0; }
+  .m-name { font-size: 12.5px; font-weight: 600; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-code { font-size: 10.5px; color: #94A3B8; font-family: monospace; }
+  .m-actions { display: flex; gap: 3px; flex-shrink: 0; }
+  .act-btn { padding: 4px 8px; border-radius: 7px; border: none; font-size: 10.5px; font-weight: 700; cursor: pointer; }
+  .act-served { background: #DCFCE7; color: #166534; }
+  .act-void   { background: #FEE2E2; color: #991B1B; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; text-transform: uppercase; }
+  .b-served { background: #DCFCE7; color: #166534; }
+  .b-called { background: rgba(245,155,10,0.15); color: #92400E; }
+
+  /* wave progress */
+  .wave-progress { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px 13px; margin-bottom: 10px; }
+  .wp-top { display: flex; justify-content: space-between; margin-bottom: 7px; }
+  .wp-label { font-size: 12px; font-weight: 700; color: #0F172A; }
+  .wp-count { font-size: 12px; color: #64748B; }
+  .wp-bar-bg { height: 6px; background: #E2E8F0; border-radius: 99px; overflow: hidden; }
+  .wp-bar-fill { height: 100%; background: #1B6B3A; border-radius: 99px; }
+
+  /* served list */
+  .served-row { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+  .check-circle { width: 26px; height: 26px; border-radius: 50%; background: #DCFCE7; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; color: #166534; font-weight: 700; }
+  .served-time { font-size: 11px; color: #94A3B8; flex-shrink: 0; }
+  .wave-pill { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px; background: #F1F5F9; color: #64748B; flex-shrink: 0; }
+
+  .bottom-nav { background: white; border-top: 1px solid #E0DDD6; display: flex; padding: 8px 0 16px; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .nav-item svg { width: 20px; height: 20px; fill: none; stroke-width: 2; }
+  .nav-label { font-size: 11px; }
+  .nav-item.active svg { stroke: #1B6B3A; }
+  .nav-item.active .nav-label { color: #1B6B3A; font-weight: 600; }
+  .nav-item:not(.active) svg { stroke: #8C8880; }
+  .nav-item:not(.active) .nav-label { color: #8C8880; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- ══════ TAB 1: ALL ══════ -->
+<div class="col">
+  <div class="label">Tab 1 — All</div>
+  <div class="phone">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="app-name">CDS Manager</span>
+      </div>
+      <div class="avatar">O</div>
+    </div>
+    <div class="session-bar">
+      <span style="font-size:14px;font-weight:600;color:#1A1A1A">Eti-Osa 3 Special CDS</span>
+      <div class="status-pill"><div class="dot"></div><span class="status-text">Open</span></div>
+    </div>
+    <div class="content">
+      <button class="btn-wave">› Call Next Wave → 2 <span class="wave-badge">20</span></button>
+      <button class="btn-back">‹ Go back to Wave start</button>
+
+      <div class="toggle-row">
+        <button class="toggle-btn active">All <span class="tab-count tc-green">92</span></button>
+        <button class="toggle-btn inactive">This Wave <span class="tab-count tc-grey">20</span></button>
+        <button class="toggle-btn inactive">Served <span class="tab-count tc-grey">19</span></button>
+      </div>
+
+      <div class="list-header">
+        <span class="list-title">Everyone today</span>
+        <span class="list-sub">92 registered</span>
+      </div>
+      <div class="search-bar">🔍 Search name or state code…</div>
+
+      <div class="wave-divider"><div class="wave-divider-line"></div><span class="wave-divider-label">Wave 1 · 19 served</span><div class="wave-divider-line"></div></div>
+      <div class="member-row dimmed">
+        <div class="q-num served">1</div>
+        <div class="m-info"><div class="m-name">Adaeze Okonkwo</div><div class="m-code">LA/24A/1234</div></div>
+        <span class="badge b-served">Served</span>
+      </div>
+      <div class="member-row dimmed">
+        <div class="q-num served">2</div>
+        <div class="m-info"><div class="m-name">Emeka Chukwu</div><div class="m-code">AB/25B/5678</div></div>
+        <span class="badge b-served">Served</span>
+      </div>
+
+      <div class="wave-divider"><div class="wave-divider-line"></div><span class="wave-divider-label">Wave 1 · waiting</span><div class="wave-divider-line"></div></div>
+      <div class="member-row">
+        <div class="q-num called">3</div>
+        <div class="m-info"><div class="m-name">Fatima Bello</div><div class="m-code">KN/24A/9012</div></div>
+        <div class="m-actions"><span class="badge b-called">Called</span><button class="act-btn act-served">Served</button></div>
+      </div>
+      <div class="member-row">
+        <div class="q-num">4</div>
+        <div class="m-info"><div class="m-name">Chidi Nwosu</div><div class="m-code">EN/25A/3344</div></div>
+        <div class="m-actions"><button class="act-btn act-served">Served</button><button class="act-btn act-void">Void</button></div>
+      </div>
+      <div class="member-row">
+        <div class="q-num">5</div>
+        <div class="m-info"><div class="m-name">Ngozi Eze</div><div class="m-code">IM/24B/7788</div></div>
+        <div class="m-actions"><button class="act-btn act-served">Served</button><button class="act-btn act-void">Void</button></div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-label">Dashboard</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-label">Check In</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="nav-label">Stats</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg><span class="nav-label">Announce</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="nav-label">Settings</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ TAB 2: THIS WAVE ══════ -->
+<div class="col">
+  <div class="label">Tab 2 — This Wave</div>
+  <div class="phone">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="app-name">CDS Manager</span>
+      </div>
+      <div class="avatar">O</div>
+    </div>
+    <div class="session-bar">
+      <span style="font-size:14px;font-weight:600;color:#1A1A1A">Eti-Osa 3 Special CDS</span>
+      <div class="status-pill"><div class="dot"></div><span class="status-text">Open</span></div>
+    </div>
+    <div class="content">
+      <button class="btn-wave">› Call Next Wave → 2 <span class="wave-badge">20</span></button>
+      <button class="btn-back">‹ Go back to Wave start</button>
+
+      <div class="toggle-row">
+        <button class="toggle-btn inactive">All <span class="tab-count tc-grey">92</span></button>
+        <button class="toggle-btn active">This Wave <span class="tab-count tc-amber">20</span></button>
+        <button class="toggle-btn inactive">Served <span class="tab-count tc-grey">19</span></button>
+      </div>
+
+      <div class="wave-progress">
+        <div class="wp-top"><span class="wp-label">Wave 1 progress</span><span class="wp-count">3 / 20 served</span></div>
+        <div class="wp-bar-bg"><div class="wp-bar-fill" style="width:15%"></div></div>
+      </div>
+
+      <div class="list-header">
+        <span class="list-title">Wave 1 only</span>
+        <span class="list-sub">17 remaining</span>
+      </div>
+      <div class="search-bar">🔍 Search name or state code…</div>
+
+      <div class="member-row dimmed">
+        <div class="q-num served">1</div>
+        <div class="m-info"><div class="m-name">Adaeze Okonkwo</div><div class="m-code">LA/24A/1234</div></div>
+        <span class="badge b-served">Served</span>
+      </div>
+      <div class="member-row">
+        <div class="q-num called">2</div>
+        <div class="m-info"><div class="m-name">Fatima Bello</div><div class="m-code">KN/24A/9012</div></div>
+        <div class="m-actions"><span class="badge b-called">Called</span><button class="act-btn act-served">Served</button></div>
+      </div>
+      <div class="member-row">
+        <div class="q-num">3</div>
+        <div class="m-info"><div class="m-name">Chidi Nwosu</div><div class="m-code">EN/25A/3344</div></div>
+        <div class="m-actions"><button class="act-btn act-served">Served</button><button class="act-btn act-void">Void</button></div>
+      </div>
+      <div class="member-row">
+        <div class="q-num">4</div>
+        <div class="m-info"><div class="m-name">Ngozi Eze</div><div class="m-code">IM/24B/7788</div></div>
+        <div class="m-actions"><button class="act-btn act-served">Served</button><button class="act-btn act-void">Void</button></div>
+      </div>
+      <div class="member-row">
+        <div class="q-num">5</div>
+        <div class="m-info"><div class="m-name">Tunde Adeyemi</div><div class="m-code">OY/25B/1122</div></div>
+        <div class="m-actions"><button class="act-btn act-served">Served</button><button class="act-btn act-void">Void</button></div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-label">Dashboard</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-label">Check In</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="nav-label">Stats</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg><span class="nav-label">Announce</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="nav-label">Settings</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ TAB 3: SERVED ══════ -->
+<div class="col">
+  <div class="label">Tab 3 — Served</div>
+  <div class="phone">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div class="shield"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span class="app-name">CDS Manager</span>
+      </div>
+      <div class="avatar">O</div>
+    </div>
+    <div class="session-bar">
+      <span style="font-size:14px;font-weight:600;color:#1A1A1A">Eti-Osa 3 Special CDS</span>
+      <div class="status-pill"><div class="dot"></div><span class="status-text">Open</span></div>
+    </div>
+    <div class="content">
+      <button class="btn-wave">› Call Next Wave → 2 <span class="wave-badge">20</span></button>
+      <button class="btn-back">‹ Go back to Wave start</button>
+
+      <div class="toggle-row">
+        <button class="toggle-btn inactive">All <span class="tab-count tc-grey">92</span></button>
+        <button class="toggle-btn inactive">This Wave <span class="tab-count tc-grey">20</span></button>
+        <button class="toggle-btn active">Served <span class="tab-count tc-teal">19</span></button>
+      </div>
+
+      <div class="list-header">
+        <span class="list-title">Cleared today</span>
+        <span class="list-sub">19 served</span>
+      </div>
+      <div class="search-bar">🔍 Verify a name or state code…</div>
+
+      <div class="served-row">
+        <div class="check-circle">✓</div>
+        <div class="m-info"><div class="m-name">Adaeze Okonkwo</div><div class="m-code">LA/24A/1234</div></div>
+        <span class="wave-pill">W1</span>
+        <span class="served-time">08:14</span>
+      </div>
+      <div class="served-row">
+        <div class="check-circle">✓</div>
+        <div class="m-info"><div class="m-name">Emeka Chukwu</div><div class="m-code">AB/25B/5678</div></div>
+        <span class="wave-pill">W1</span>
+        <span class="served-time">08:16</span>
+      </div>
+      <div class="served-row">
+        <div class="check-circle">✓</div>
+        <div class="m-info"><div class="m-name">Bola Adewale</div><div class="m-code">OG/24A/2211</div></div>
+        <span class="wave-pill">W1</span>
+        <span class="served-time">08:19</span>
+      </div>
+      <div class="served-row">
+        <div class="check-circle">✓</div>
+        <div class="m-info"><div class="m-name">Amaka Obi</div><div class="m-code">AN/25A/4433</div></div>
+        <span class="wave-pill">W1</span>
+        <span class="served-time">08:21</span>
+      </div>
+      <div class="served-row">
+        <div class="check-circle">✓</div>
+        <div class="m-info"><div class="m-name">Seun Afolabi</div><div class="m-code">OS/24B/9900</div></div>
+        <span class="wave-pill">W1</span>
+        <span class="served-time">08:23</span>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nav-label">Dashboard</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span class="nav-label">Check In</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="nav-label">Stats</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg><span class="nav-label">Announce</span></div>
+      <div class="nav-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span class="nav-label">Settings</span></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

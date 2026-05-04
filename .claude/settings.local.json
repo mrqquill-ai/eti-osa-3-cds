@@ -37,7 +37,8 @@
       "Bash(git commit *)",
       "Bash(python3 -c ' *)",
       "Bash(npx vite *)",
-      "Bash(grep -n \"^  \\)\\\\n}\\\\|^  \\)\\\\s*$\\\\|^}\" \"/Users/0nyeulochijiokechimuanya/ETI-OSA 3/src/pages/Dashboard.jsx\")"
+      "Bash(grep -n \"^  \\)\\\\n}\\\\|^  \\)\\\\s*$\\\\|^}\" \"/Users/0nyeulochijiokechimuanya/ETI-OSA 3/src/pages/Dashboard.jsx\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

@@ -21,24 +21,6 @@ export default function Login() {
       const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
       if (authErr) throw authErr
 
-      // Super admins always go straight to the dashboard
-      const role = authData?.user?.user_metadata?.role
-      if (role === 'super_admin') {
-        navigate('/dashboard', { replace: true })
-        return
-      }
-
-      // Check approval status for all other users
-      try {
-        const { data: profile } = await supabase.rpc('get_my_exec_profile')
-        if (profile?.status === 'pending' || profile?.status === 'rejected') {
-          navigate('/pending-approval', { replace: true })
-          return
-        }
-      } catch {
-        // If RPC not available yet (migration not run), fall through to dashboard
-      }
-
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err.message === 'Invalid login credentials'

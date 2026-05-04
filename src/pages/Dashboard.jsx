@@ -36,14 +36,11 @@ export default function Dashboard() {
   // ── ALL hooks declared up front (React rules of hooks) ──
   const navigate = useNavigate()
   const [sessionChecked, setSessionChecked] = useState(false)   // true once auth check done
-  const [adminPin, setAdminPin] = useState('')
-  const [unlocked, setUnlocked] = useState(false)
+    const [unlocked, setUnlocked] = useState(false)
   const [role, setRole] = useState('executive')
   const isSuperAdmin = role === 'super_admin'
   // Legacy PIN state (kept for manual super-admin pin entry flow)
-  const [pinInput, setPinInput] = useState('')
-  const [pinError, setPinError] = useState('')
-
+    
   // Super admin modals
   const [showAddRegModal, setShowAddRegModal] = useState(false)
   const [addRegName, setAddRegName] = useState('')
@@ -52,12 +49,7 @@ export default function Dashboard() {
   const [editName, setEditName] = useState('')
   const [editCode, setEditCode] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
-  const [showSuperPinModal, setShowSuperPinModal] = useState(false)
-  const [newSuperPin, setNewSuperPin] = useState('')
-  const [pinLocked, setPinLocked] = useState(false)
-  const [showForceExecPinModal, setShowForceExecPinModal] = useState(false)
-  const [forceExecPin, setForceExecPin] = useState('')
-
+          
   // Super admin panel
   const [superTab, setSuperTab] = useState(null) // null=collapsed, 'approvals','log','stats','announce','sessions','archives','duplicates','venue'
   // Exec approvals
@@ -111,9 +103,7 @@ export default function Dashboard() {
   const [showEmptyBatchConfirm, setShowEmptyBatchConfirm] = useState(false)
   const [showVoidConfirm, setShowVoidConfirm] = useState(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
-  const [showChangePinModal, setShowChangePinModal] = useState(false)
-  const [newPinInput, setNewPinInput] = useState('')
-  const [busy, setBusy] = useState(false)
+      const [busy, setBusy] = useState(false)
   const [rowBusy, setRowBusy] = useState(null)
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -124,9 +114,7 @@ export default function Dashboard() {
   const lastActivityRef = useRef(Date.now())
 
   const [timeoutWarning, setTimeoutWarning] = useState(false)
-  const [pinAttempts, setPinAttempts] = useState(0)
-  const [pinLockUntil, setPinLockUntil] = useState(0)
-  const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
+      const [showChangeBatchSize, setShowChangeBatchSize] = useState(false)
   const [newBatchSize, setNewBatchSize] = useState(30)
   const [dashTab, setDashTab] = useState('wave')
   const [expandedRow, setExpandedRow] = useState(null)
@@ -144,24 +132,7 @@ export default function Dashboard() {
       const detectedRole = meta.role === 'super_admin' ? 'super_admin' : 'executive'
       setRole(detectedRole)
 
-      // Auto-fetch the correct PIN for this role:
-      // - Super admin needs the super_pin for all super admin RPCs
-      // - Regular execs need the exec pin
-      try {
-        if (detectedRole === 'super_admin') {
-          const { data: superPin } = await supabase.rpc('get_super_pin')
-          if (superPin) setAdminPin(superPin)
-        } else {
-          const { data: execPin } = await supabase.rpc('get_exec_pin')
-          if (execPin) setAdminPin(execPin)
-        }
-      } catch {
-        // Fallback: try exec pin
-        try {
-          const { data: execPin } = await supabase.rpc('get_exec_pin')
-          if (execPin) setAdminPin(execPin)
-        } catch {}
-      }
+
 
       setUnlocked(true)
       setSessionChecked(true)
@@ -272,7 +243,6 @@ export default function Dashboard() {
       friendly = 'Invalid PIN. Your session may have expired. Please refresh and log in again.'
       // Force re-lock
       setUnlocked(false)
-      setAdminPin('')
       setRole('executive')
       supabase.auth.signOut()
     } else if (raw.includes('dashboard_frozen')) {
@@ -388,7 +358,7 @@ export default function Dashboard() {
   async function startSession() {
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: pendingBatchSize })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_batch_size: pendingBatchSize })
       if (e) throw e
       flash('New session started.')
       setShowStartModal(false)
@@ -399,7 +369,7 @@ export default function Dashboard() {
     if (!settings) return
     setBusy(true); setError('')
     try {
-      const { data, error: e } = await supabase.rpc('admin_call_next_batch', { p_pin: adminPin })
+      const { data, error: e } = await supabase.rpc('admin_call_next_batch')
       if (e) throw e
       flash(`Now calling wave ${data}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
@@ -441,7 +411,7 @@ export default function Dashboard() {
     if (!settings || settings.current_batch <= 0) return
     setBusy(true); setError('')
     try {
-      const { data, error: e } = await supabase.rpc('admin_go_back_batch', { p_pin: adminPin })
+      const { data, error: e } = await supabase.rpc('admin_go_back_batch')
       if (e) throw e
       flash(data === 0 ? 'Went back - no wave serving now.' : `Went back to wave ${data}.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
@@ -451,7 +421,7 @@ export default function Dashboard() {
     if (!settings) return
     setBusy(true); setError('')
     try {
-      const { data, error: e } = await supabase.rpc('admin_toggle_registration', { p_pin: adminPin })
+      const { data, error: e } = await supabase.rpc('admin_toggle_registration')
       if (e) throw e
       flash(data ? 'Registration reopened.' : 'Registration closed.')
       setShowSettingsMenu(false)
@@ -461,7 +431,7 @@ export default function Dashboard() {
   async function toggleServed(row) {
     setRowBusy(row.id); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_toggle_served', { p_pin: adminPin, p_registration_id: row.id })
+      const { error: e } = await supabase.rpc('admin_toggle_served', { p_registration_id: row.id })
       if (e) throw e
       flash(row.served_at ? `Unmarked ${row.full_name} as served.` : `Marked ${row.full_name} as served.`)
     } catch (e) { showError(e) } finally { setRowBusy(null) }
@@ -470,7 +440,7 @@ export default function Dashboard() {
   async function toggleVoid(row) {
     setRowBusy(row.id); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_toggle_void', { p_pin: adminPin, p_registration_id: row.id })
+      const { error: e } = await supabase.rpc('admin_toggle_void', { p_registration_id: row.id })
       if (e) throw e
       flash(row.voided ? `Restored ${row.full_name}.` : `Voided ${row.full_name}.`)
       setShowVoidConfirm(null)
@@ -484,7 +454,7 @@ export default function Dashboard() {
     const summary = { registered: counts.registered, served: counts.served, waiting: counts.waiting, waves: settings?.current_batch || 0 }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: settings?.batch_size ?? 30 })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_batch_size: settings?.batch_size ?? 30 })
       if (e) throw e
       setShowResetConfirm(false)
       setResetConfirmText('')
@@ -542,7 +512,7 @@ export default function Dashboard() {
     setBusy(true); setError('')
     try {
       const { data, error: e } = await supabase.rpc('super_admin_add_registration', {
-        p_super_pin: adminPin, p_state_code: code, p_full_name: name
+        p_state_code: code, p_full_name: name
       })
       if (e) throw e
       flash(`Added ${name} — Q#${data.queue_number}, Wave ${data.batch_number}`)
@@ -564,7 +534,7 @@ export default function Dashboard() {
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.rpc('super_admin_edit_registration', {
-        p_super_pin: adminPin, p_registration_id: showEditModal.id, p_full_name: name, p_state_code: code
+        p_registration_id: showEditModal.id, p_full_name: name, p_state_code: code
       })
       if (e) throw e
       flash(`Updated ${name}.`)
@@ -581,7 +551,7 @@ export default function Dashboard() {
     setRowBusy(showDeleteConfirm.id); setError('')
     try {
       const { error: e } = await supabase.rpc('super_admin_delete_registration', {
-        p_super_pin: adminPin, p_registration_id: showDeleteConfirm.id
+        p_registration_id: showDeleteConfirm.id
       })
       if (e) throw e
       flash(`Permanently deleted ${showDeleteConfirm.full_name}.`)
@@ -592,7 +562,7 @@ export default function Dashboard() {
   async function superTogglePinLock() {
     setBusy(true); setError('')
     try {
-      const { data, error: e } = await supabase.rpc('super_admin_toggle_pin_lock', { p_super_pin: adminPin })
+      const { data, error: e } = await supabase.rpc('super_admin_toggle_pin_lock')
       if (e) throw e
       setPinLocked(data)
       flash(data ? 'Executive PIN is now locked. Executives cannot change it.' : 'Executive PIN is now unlocked. Executives can change it.')
@@ -604,7 +574,7 @@ export default function Dashboard() {
     if (forceExecPin.length < 4) { setError('PIN must be at least 4 characters.'); return }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_set_exec_pin', { p_super_pin: adminPin, p_new_pin: forceExecPin })
+      const { error: e } = await supabase.rpc('super_admin_set_exec_pin', { p_new_pin: forceExecPin })
       if (e) throw e
       flash('Executive PIN has been changed.')
       setShowForceExecPinModal(false); setForceExecPin('')
@@ -615,7 +585,7 @@ export default function Dashboard() {
   async function loadExecList() {
     setExecListLoading(true)
     try {
-      const { data } = await supabase.rpc('super_admin_list_execs', { p_super_pin: adminPin })
+      const { data } = await supabase.rpc('super_admin_list_execs')
       if (data) setExecList(data)
     } catch (e) { showError(e) } finally { setExecListLoading(false) }
   }
@@ -623,7 +593,7 @@ export default function Dashboard() {
   async function approveExec(userId) {
     setApprovingId(userId)
     try {
-      const { error: e } = await supabase.rpc('super_admin_approve_exec', { p_super_pin: adminPin, p_user_id: userId })
+      const { error: e } = await supabase.rpc('super_admin_approve_exec', { p_user_id: userId })
       if (e) throw e
       setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'approved', reviewed_at: new Date().toISOString(), rejection_reason: null } : p))
       flash('Access approved.')
@@ -633,7 +603,7 @@ export default function Dashboard() {
   async function rejectExec(userId) {
     setRejectingId(userId)
     try {
-      const { error: e } = await supabase.rpc('super_admin_reject_exec', { p_super_pin: adminPin, p_user_id: userId, p_reason: rejectReason.trim() })
+      const { error: e } = await supabase.rpc('super_admin_reject_exec', { p_user_id: userId, p_reason: rejectReason.trim() })
       if (e) throw e
       setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'rejected', reviewed_at: new Date().toISOString(), rejection_reason: rejectReason.trim() } : p))
       flash('Access rejected.')
@@ -645,21 +615,21 @@ export default function Dashboard() {
   async function loadActivityLog() {
     setLogLoading(true)
     try {
-      const { data } = await supabase.rpc('super_admin_get_activity_log', { p_super_pin: adminPin, p_limit: 100 })
+      const { data } = await supabase.rpc('super_admin_get_activity_log', { p_limit: 100 })
       if (data) setActivityLog(data)
     } catch {} finally { setLogLoading(false) }
   }
 
   async function loadExecSessions() {
     try {
-      const { data } = await supabase.rpc('super_admin_get_active_sessions', { p_super_pin: adminPin })
+      const { data } = await supabase.rpc('super_admin_get_active_sessions')
       if (data) setExecSessions(data)
     } catch {}
   }
 
   async function loadArchiveDates() {
     try {
-      const { data } = await supabase.rpc('super_admin_get_archive_dates', { p_super_pin: adminPin })
+      const { data } = await supabase.rpc('super_admin_get_archive_dates')
       if (data) setArchiveDates(data)
     } catch {}
   }
@@ -667,14 +637,14 @@ export default function Dashboard() {
   async function loadArchiveForDate(date) {
     setArchiveDate(date)
     try {
-      const { data } = await supabase.rpc('super_admin_get_archives', { p_super_pin: adminPin, p_date: date })
+      const { data } = await supabase.rpc('super_admin_get_archives', { p_date: date })
       if (data) setArchiveRows(data)
     } catch {}
   }
 
   async function loadDuplicates() {
     try {
-      const { data } = await supabase.rpc('super_admin_find_duplicates', { p_super_pin: adminPin })
+      const { data } = await supabase.rpc('super_admin_find_duplicates')
       if (data) setDuplicates(data)
     } catch {}
   }
@@ -682,7 +652,7 @@ export default function Dashboard() {
   async function saveAnnouncement() {
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_set_announcement', { p_super_pin: adminPin, p_announcement: announcement })
+      const { error: e } = await supabase.rpc('super_admin_set_announcement', { p_announcement: announcement })
       if (e) throw e
       flash(announcement ? 'Announcement published to all status pages.' : 'Announcement cleared.')
     } catch (e) { showError(e) } finally { setBusy(false) }
@@ -691,7 +661,7 @@ export default function Dashboard() {
   async function toggleFreeze() {
     setBusy(true); setError('')
     try {
-      const { data, error: e } = await supabase.rpc('super_admin_toggle_freeze', { p_super_pin: adminPin })
+      const { data, error: e } = await supabase.rpc('super_admin_toggle_freeze')
       if (e) throw e
       flash(data ? 'Executive actions are now frozen. Only you can act.' : 'Executive actions unfrozen.')
     } catch (e) { showError(e) } finally { setBusy(false) }
@@ -701,7 +671,7 @@ export default function Dashboard() {
     if (!showMoveWaveModal || !targetWave) return
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_move_to_wave', { p_super_pin: adminPin, p_registration_id: showMoveWaveModal.id, p_target_wave: targetWave })
+      const { error: e } = await supabase.rpc('super_admin_move_to_wave', { p_registration_id: showMoveWaveModal.id, p_target_wave: targetWave })
       if (e) throw e
       flash(`Moved ${showMoveWaveModal.full_name} to Wave ${targetWave}.`)
       setShowMoveWaveModal(null)
@@ -712,7 +682,7 @@ export default function Dashboard() {
     if (!showNoteModal) return
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_set_note', { p_super_pin: adminPin, p_registration_id: showNoteModal.id, p_note: noteText })
+      const { error: e } = await supabase.rpc('super_admin_set_note', { p_registration_id: showNoteModal.id, p_note: noteText })
       if (e) throw e
       flash('Note saved.')
       setShowNoteModal(null)
@@ -725,7 +695,7 @@ export default function Dashboard() {
     if (!targetRow) { setError('State code not found in current registrations.'); return }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_swap_positions', { p_super_pin: adminPin, p_id_a: showSwapModal.id, p_id_b: targetRow.id })
+      const { error: e } = await supabase.rpc('super_admin_swap_positions', { p_id_a: showSwapModal.id, p_id_b: targetRow.id })
       if (e) throw e
       flash(`Swapped Q#${showSwapModal.queue_number} and Q#${targetRow.queue_number}.`)
       setShowSwapModal(null); setSwapTargetCode('')
@@ -740,7 +710,7 @@ export default function Dashboard() {
       try {
         const row = rows.find(r => r.id === id)
         if (row && !row.served_at && !row.voided) {
-          await supabase.rpc('admin_toggle_served', { p_pin: adminPin, p_registration_id: id })
+          await supabase.rpc('admin_toggle_served', { p_registration_id: id })
           count++
         }
       } catch {}
@@ -757,7 +727,7 @@ export default function Dashboard() {
       try {
         const row = rows.find(r => r.id === id)
         if (row && !row.voided) {
-          await supabase.rpc('admin_toggle_void', { p_pin: adminPin, p_registration_id: id })
+          await supabase.rpc('admin_toggle_void', { p_registration_id: id })
           count++
         }
       } catch {}
@@ -885,7 +855,6 @@ export default function Dashboard() {
     setBusy(true); setVenueSuccess('')
     try {
       const { error: e } = await supabase.rpc('super_admin_update_geo_settings', {
-        p_super_pin:          adminPin,
         p_geofencing_enabled: venueGeoEnabled,
         p_venue_lat:          lat,
         p_venue_lng:          lng,
@@ -914,18 +883,7 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
-  async function superChangeSuperPin() {
-    if (newSuperPin.length < 6) { setError('Super admin PIN must be at least 6 characters.'); return }
-    setBusy(true); setError('')
-    try {
-      const { error: e } = await supabase.rpc('super_admin_change_pin', { p_current_super_pin: adminPin, p_new_super_pin: newSuperPin })
-      if (e) throw e
-      setAdminPin(newSuperPin)
-      setAdminPin(newSuperPin)
-      flash('Super admin PIN changed.')
-      setShowSuperPinModal(false); setNewSuperPin('')
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
+
 
   function formatTime(ts) {
     return new Date(ts).toLocaleTimeString('en-NG', {
@@ -973,14 +931,6 @@ export default function Dashboard() {
         <div className="mb-3 rounded-xl p-3 flex items-center gap-2 animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
           <span className="text-sm font-semibold" style={{ color: '#92640A' }}>Session will lock in ~2 minutes. Tap anywhere to stay logged in.</span>
-        </div>
-      )}
-
-      {/* ── Default PIN warning ── */}
-      {adminPin === '2025' && (
-        <div className="mb-3 rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
-          <span className="text-sm font-semibold" style={{ color: '#92640A' }}>You are using the default executive PIN. Change it in Settings.</span>
         </div>
       )}
 

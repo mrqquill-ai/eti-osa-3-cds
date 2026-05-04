@@ -14,6 +14,7 @@ import Login from './pages/auth/Login.jsx'
 import Signup from './pages/auth/Signup.jsx'
 import ForgotPassword from './pages/auth/ForgotPassword.jsx'
 import PendingApproval from './pages/auth/PendingApproval.jsx'
+import ProtectedRoute from './pages/auth/ProtectedRoute.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -32,14 +33,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
         {/* ── App pages (shared header/nav shell) ── */}
         <Route element={<App />}>
+          {/* Public / Corps Member Routes */}
           <Route index                   element={<Navigate to="/join" replace />} />
-          <Route path="/manager"         element={<Manager />} />
-          <Route path="/status/:stateCode" element={<Status />} />
           <Route path="/join"            element={<Join />} />
-          <Route path="/dashboard"       element={<Dashboard />} />
-          <Route path="/stats"           element={<Stats />} />
-          <Route path="/announce"        element={<Announce />} />
-          <Route path="/settings"        element={<SettingsPage />} />
+          <Route path="/status/:stateCode" element={<Status />} />
+
+          {/* Protected Exec Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/manager"         element={<Manager />} />
+            <Route path="/dashboard"       element={<Dashboard />} />
+            <Route path="/stats"           element={<Stats />} />
+            <Route path="/announce"        element={<Announce />} />
+            <Route path="/settings"        element={<SettingsPage />} />
+          </Route>
+
           <Route path="*"                element={<Navigate to="/join" replace />} />
         </Route>
       </Routes>

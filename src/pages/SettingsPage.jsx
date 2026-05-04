@@ -126,13 +126,10 @@ export default function SettingsPage() {
   }, [navigate])
 
   const [settings,    setSettings]    = useState(null)
-  const [adminPin,    setAdminPin]    = useState('')
-  const [busy,        setBusy]        = useState(false)
+    const [busy,        setBusy]        = useState(false)
   const [toast,       setToast]       = useState('')
   const [error,       setError]       = useState('')
   const [sheet,       setSheet]       = useState(null)
-  const [copied,      setCopied]      = useState(false)
-  const qrRef = useRef(null)
   const [newBatchSize,setNewBatchSize]= useState(30)
   const [newPin,      setNewPin]      = useState('')
   const [resetText,   setResetText]   = useState('')
@@ -152,10 +149,7 @@ export default function SettingsPage() {
         setVenueRadius(String(s.venue_radius_m ?? '350'))
         setGeoEnabled(s.geofencing_enabled ?? true)
       }
-      try {
-        const { data: pin } = await supabase.rpc('get_exec_pin')
-        if (pin) setAdminPin(pin)
-      } catch {}
+
     }
     load()
 
@@ -170,56 +164,13 @@ export default function SettingsPage() {
   function flash(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
   function closeSheet() { setSheet(null); setError('') }
 
-  const joinUrl = `${window.location.origin}/join`
-
-  async function copyLink() {
-    try { await navigator.clipboard.writeText(joinUrl) } catch {
-      const inp = document.createElement('input')
-      inp.value = joinUrl; document.body.appendChild(inp); inp.select()
-      document.execCommand('copy'); document.body.removeChild(inp)
-    }
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-
-  function shareWhatsApp() {
-    const text = encodeURIComponent(`Eti-Osa 3 Special CDS — Join the queue from your phone:\n${joinUrl}`)
-    window.open(`https://wa.me/?text=${text}`, '_blank')
-  }
-
-  async function shareNative() {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Eti-Osa 3 CDS Check-In', text: 'Join the queue from your phone', url: joinUrl })
-      } catch {}
-    } else {
-      await copyLink()
-    }
-  }
-
-  function downloadQR() {
-    const canvas = qrRef.current?.querySelector('canvas')
-    if (!canvas) return
-    // Draw onto a padded canvas for nicer output
-    const pad = 24
-    const out = document.createElement('canvas')
-    out.width  = canvas.width  + pad * 2
-    out.height = canvas.height + pad * 2
-    const ctx = out.getContext('2d')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, out.width, out.height)
-    ctx.drawImage(canvas, pad, pad)
-    const a = document.createElement('a')
-    a.href = out.toDataURL('image/png')
-    a.download = 'eti-osa-3-checkin-qr.png'
-    a.click()
-  }
 
   async function toggleRegistration() {
     setBusy(true); setError('')
     const newVal = !settings?.registration_open
     setSettings(prev => ({ ...prev, registration_open: newVal }))
     try {
-      const { error: e } = await supabase.rpc('admin_toggle_registration', { p_pin: adminPin })
+      const { error: e } = await supabase.rpc('admin_toggle_registration', {})
       if (e) throw e
       flash(newVal ? 'Session opened.' : 'Session closed.')
       closeSheet()
@@ -247,7 +198,7 @@ export default function SettingsPage() {
     if (newBatchSize < 10 || newBatchSize > 100) { setError('Wave size must be 10–100.'); return }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: newBatchSize })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_batch_size: newBatchSize })
       if (e) throw e
       flash('New session started.')
       closeSheet()
@@ -266,23 +217,14 @@ export default function SettingsPage() {
   }
 
   async function changePin() {
-    if (newPin.length < 4) { setError('PIN must be at least 4 characters.'); return }
-    setBusy(true); setError('')
-    try {
-      const { error: e } = await supabase.rpc('admin_change_pin', { p_current_pin: adminPin, p_new_pin: newPin })
-      if (e) throw e
-      setAdminPin(newPin)
-      flash('Executive PIN changed.')
-      setNewPin('')
-      closeSheet()
-    } catch (e) { setError(e.message || 'Could not change PIN.') } finally { setBusy(false) }
+    // Legacy pin logic removed
   }
 
   async function resetDay() {
     if (resetText !== 'RESET') { setError('Type RESET to confirm.'); return }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('admin_reset_day', { p_pin: adminPin, p_batch_size: settings?.batch_size ?? 30 })
+      const { error: e } = await supabase.rpc('admin_reset_day', { p_batch_size: settings?.batch_size ?? 30 })
       if (e) throw e
       flash('Day reset. All entries archived.')
       setResetText('')
@@ -383,7 +325,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={isOpen ? () => setSheet('closeSession') : toggleRegistration}
-                disabled={busy || !settings || !adminPin}
+                disabled={busy || !settings}
                 className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 style={{
                   backgroundColor: isOpen ? 'rgba(192,57,43,0.08)' : 'rgba(27,107,58,0.1)',
@@ -401,7 +343,7 @@ export default function SettingsPage() {
               title="Start New Session"
               subtitle="Archives today's entries and resets the queue"
               onClick={() => { setNewBatchSize(settings?.batch_size ?? 30); setSheet('newSession'); setError('') }}
-              disabled={!settings || !adminPin}
+              disabled={!settings}
             />
 
             <Divider />
@@ -420,86 +362,6 @@ export default function SettingsPage() {
             />
           </Card>
 
-          {/* CHECK-IN LINK */}
-          <Card>
-            <CardHeader label="Check-in Link" />
-            <div className="px-5 py-5 space-y-4">
-              <p className="text-xs" style={{ color: MUTED }}>
-                Share this link or QR code with corps members so they can join the queue from their phones.
-              </p>
-
-              {/* QR Code */}
-              <div className="flex flex-col items-center gap-3">
-                <div
-                  ref={qrRef}
-                  className="p-3 rounded-2xl inline-block"
-                  style={{ backgroundColor: '#fff', border: `1.5px solid ${LINE}`, boxShadow: '0 1px 6px rgba(0,0,0,0.07)' }}
-                >
-                  <QRCodeCanvas
-                    value={joinUrl}
-                    size={160}
-                    bgColor="#ffffff"
-                    fgColor={INK}
-                    level="M"
-                    includeMargin={false}
-                  />
-                </div>
-                <button
-                  onClick={downloadQR}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:opacity-70"
-                  style={{ backgroundColor: '#F1F5F9', color: MUTED }}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Download QR
-                </button>
-              </div>
-
-              {/* URL row */}
-              <div className="flex items-center gap-2 p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
-                <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: MUTED }} />
-                <span className="flex-1 text-xs font-mono truncate" style={{ color: INK }}>
-                  {joinUrl}
-                </span>
-              </div>
-
-              {/* Share buttons */}
-              <div className="grid grid-cols-3 gap-2">
-                {/* Copy */}
-                <button
-                  onClick={copyLink}
-                  className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-semibold transition-colors active:opacity-70"
-                  style={{ backgroundColor: copied ? 'rgba(27,107,58,0.08)' : '#F1F5F9', color: copied ? G : MUTED, border: `1px solid ${LINE}` }}
-                >
-                  <Copy className="w-4 h-4" />
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-
-                {/* WhatsApp */}
-                <button
-                  onClick={shareWhatsApp}
-                  className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-semibold transition-colors active:opacity-70"
-                  style={{ backgroundColor: 'rgba(37,211,102,0.08)', color: '#128C7E', border: '1px solid rgba(37,211,102,0.2)' }}
-                >
-                  {/* WhatsApp icon using SVG */}
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.126 1.528 5.858L.057 23.571a.5.5 0 00.612.612l5.713-1.471A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.793 9.793 0 01-5.015-1.378l-.36-.214-3.733.961.982-3.617-.235-.374A9.793 9.793 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182S21.818 6.57 21.818 12 17.43 21.818 12 21.818z"/>
-                  </svg>
-                  WhatsApp
-                </button>
-
-                {/* Native Share */}
-                <button
-                  onClick={shareNative}
-                  className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-semibold transition-colors active:opacity-70"
-                  style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1px solid rgba(27,107,58,0.15)` }}
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </button>
-              </div>
-            </div>
-          </Card>
 
         </div>
 
@@ -565,7 +427,7 @@ export default function SettingsPage() {
               title="Reset Day"
               subtitle="Archive all entries and start fresh"
               onClick={() => { setResetText(''); setSheet('resetDay'); setError('') }}
-              disabled={!settings || !adminPin}
+              disabled={!settings}
               destructive
             />
           </Card>
