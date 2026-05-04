@@ -459,6 +459,23 @@ export default function Manager() {
                 {lookupBusy ? '…' : 'Search'}
               </button>
             </div>
+            {lookupError && <p className="text-red-600 text-xs font-semibold mt-2">{lookupError}</p>}
+            {lookupResult && (
+              <div className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                style={{ backgroundColor: 'rgba(27,107,58,0.06)', border: `1px solid rgba(27,107,58,0.15)` }}>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: INK }}>{lookupResult.full_name}</p>
+                  <p className="text-xs font-mono mt-0.5" style={{ color: MUTED }}>
+                    {lookupResult.state_code} · Q#{lookupResult.queue_number} · Wave {lookupResult.batch_number}
+                  </p>
+                </div>
+                <Link to={`/status/${encodeURIComponent(lookupResult.state_code)}`}
+                  className="text-xs font-bold underline flex-shrink-0" style={{ color: G }}>
+                  Status page
+                </Link>
+              </div>
+            )}
+          </div>
 
           {/* Check-in Link Card */}
           <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
@@ -533,23 +550,6 @@ export default function Manager() {
                 Share
               </button>
             </div>
-          </div>
-            {lookupError && <p className="text-red-600 text-xs font-semibold mt-2">{lookupError}</p>}
-            {lookupResult && (
-              <div className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-                style={{ backgroundColor: 'rgba(27,107,58,0.06)', border: `1px solid rgba(27,107,58,0.15)` }}>
-                <div>
-                  <p className="text-sm font-bold" style={{ color: INK }}>{lookupResult.full_name}</p>
-                  <p className="text-xs font-mono mt-0.5" style={{ color: MUTED }}>
-                    {lookupResult.state_code} · Q#{lookupResult.queue_number} · Wave {lookupResult.batch_number}
-                  </p>
-                </div>
-                <Link to={`/status/${encodeURIComponent(lookupResult.state_code)}`}
-                  className="text-xs font-bold underline flex-shrink-0" style={{ color: G }}>
-                  Status page
-                </Link>
-              </div>
-            )}
           </div>
 
           {/* Recent (mobile only – desktop has live feed on right) */}
