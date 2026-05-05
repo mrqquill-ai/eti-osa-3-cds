@@ -17,7 +17,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  LockKeyhole,
   Unlock
 } from 'lucide-react'
 import jsQR from 'jsqr'
@@ -476,32 +475,7 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
-  async function changePin() {
-    if (newPinInput.length < 4) {
-      setError('New PIN must be at least 4 characters.')
-      return
-    }
-    setBusy(true); setError('')
-    try {
-      const { error: e } = await supabase.rpc('admin_change_pin', { p_current_pin: adminPin, p_new_pin: newPinInput })
-      if (e) {
-        if (e.message?.includes('pin_is_locked')) {
-          setError('The executive PIN is locked by the super admin. Only the super admin can change it.')
-          setBusy(false)
-          return
-        }
-        throw e
-      }
-      // If super admin changed exec PIN, don't update own PIN
-      if (!isSuperAdmin) {
-        setAdminPin(newPinInput)
-        setAdminPin(newPinInput)
-      }
-      setShowChangePinModal(false)
-      setNewPinInput('')
-      flash('Executive PIN changed successfully.')
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
+
 
   // ── Super Admin actions ─────────────────────────────────
   async function superAddRegistration() {
@@ -559,27 +533,7 @@ export default function Dashboard() {
     } catch (e) { showError(e) } finally { setRowBusy(null) }
   }
 
-  async function superTogglePinLock() {
-    setBusy(true); setError('')
-    try {
-      const { data, error: e } = await supabase.rpc('super_admin_toggle_pin_lock')
-      if (e) throw e
-      setPinLocked(data)
-      flash(data ? 'Executive PIN is now locked. Executives cannot change it.' : 'Executive PIN is now unlocked. Executives can change it.')
-      setShowSettingsMenu(false)
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
 
-  async function superForceExecPin() {
-    if (forceExecPin.length < 4) { setError('PIN must be at least 4 characters.'); return }
-    setBusy(true); setError('')
-    try {
-      const { error: e } = await supabase.rpc('super_admin_set_exec_pin', { p_new_pin: forceExecPin })
-      if (e) throw e
-      flash('Executive PIN has been changed.')
-      setShowForceExecPinModal(false); setForceExecPin('')
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
 
   // ── Super Admin panel loaders ────────────────────────────
   async function loadExecList() {
@@ -1887,37 +1841,7 @@ export default function Dashboard() {
         </Modal>
       )}
 
-      {showChangePinModal && (
-        <Modal onClose={() => { setShowChangePinModal(false); setNewPinInput('') }}>
-          <h2 className="text-lg font-extrabold text-slate-950">Change executive PIN</h2>
-          <p className="text-slate-700 text-sm mt-1">
-            Enter a new executive PIN (at least 4 characters). All executives will use this PIN.
-          </p>
-          <input
-            type="password"
-            value={newPinInput}
-            onChange={(e) => setNewPinInput(e.target.value)}
-            placeholder="New executive PIN"
-            autoFocus
-            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-3"
-          />
-          <div className="mt-5 flex gap-2 justify-end">
-            <button
-              onClick={() => { setShowChangePinModal(false); setNewPinInput('') }}
-              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={changePin}
-              disabled={busy || newPinInput.length < 4}
-              className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-400 text-white font-bold transition-colors"
-            >
-              Save new PIN
-            </button>
-          </div>
-        </Modal>
-      )}
+
 
       {/* ── Super Admin Modals ── */}
       {showAddRegModal && (
@@ -2034,36 +1958,7 @@ export default function Dashboard() {
         </Modal>
       )}
 
-      {showForceExecPinModal && (
-        <Modal onClose={() => { setShowForceExecPinModal(false); setForceExecPin('') }}>
-          <div className="flex items-center gap-2 mb-1">
-            <LockKeyhole className="w-5 h-5 text-purple-700" />
-            <h2 className="text-lg font-extrabold text-slate-950">Set executive PIN</h2>
-          </div>
-          <p className="text-slate-700 text-sm mt-1">
-            Force-set the executive PIN. All executives will need to use this new PIN.
-          </p>
-          <input
-            type="password"
-            value={forceExecPin}
-            onChange={(e) => setForceExecPin(e.target.value)}
-            placeholder="New executive PIN"
-            autoFocus
-            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-3"
-          />
-          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
-          <div className="mt-5 flex gap-2 justify-end">
-            <button onClick={() => { setShowForceExecPinModal(false); setForceExecPin('') }} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
-            <button
-              onClick={superForceExecPin}
-              disabled={busy || forceExecPin.length < 4}
-              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
-            >
-              Set PIN
-            </button>
-          </div>
-        </Modal>
-      )}
+
 
       {showQRScanner && (
         <Modal onClose={stopQRScan}>
@@ -2126,36 +2021,7 @@ export default function Dashboard() {
         </Modal>
       )}
 
-      {showSuperPinModal && (
-        <Modal onClose={() => { setShowSuperPinModal(false); setNewSuperPin('') }}>
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-5 h-5 text-purple-700" />
-            <h2 className="text-lg font-extrabold text-slate-950">Change super admin PIN</h2>
-          </div>
-          <p className="text-slate-700 text-sm mt-1">
-            Enter a new super admin PIN (at least 6 characters). Only you should know this.
-          </p>
-          <input
-            type="password"
-            value={newSuperPin}
-            onChange={(e) => setNewSuperPin(e.target.value)}
-            placeholder="New super admin PIN"
-            autoFocus
-            className="mt-3 w-full text-center text-2xl tracking-[0.3em] font-bold rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-3"
-          />
-          {error && <div className="mt-3 text-red-700 text-sm font-semibold">{error}</div>}
-          <div className="mt-5 flex gap-2 justify-end">
-            <button onClick={() => { setShowSuperPinModal(false); setNewSuperPin('') }} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Cancel</button>
-            <button
-              onClick={superChangeSuperPin}
-              disabled={busy || newSuperPin.length < 6}
-              className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-slate-400 text-white font-bold transition-colors"
-            >
-              Save
-            </button>
-          </div>
-        </Modal>
-      )}
+
 
     </div>
   )
