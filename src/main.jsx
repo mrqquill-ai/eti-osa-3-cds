@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import ErrorBoundary from './ErrorBoundary.jsx'
 import App from './App.jsx'
 import Manager from './pages/Manager.jsx'
 import Status from './pages/Status.jsx'
@@ -19,6 +20,7 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         {/* ── Auth pages (own layout, no app shell) ── */}
@@ -51,5 +53,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )
