@@ -44,26 +44,38 @@ export default function AnnouncePage() {
     return () => subscription.unsubscribe()
   }, [navigate])
 
-  const [current, setCurrent] = useState('')
-  const [draft,   setDraft]   = useState('')
-  const [busy,    setBusy]    = useState(false)
-  const [toast,   setToast]   = useState('')
+  const [current,        setCurrent]        = useState('')
+  const [draft,          setDraft]          = useState('')
+  const [busy,           setBusy]           = useState(false)
+  const [toast,          setToast]          = useState('')
+  const [history,        setHistory]        = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
 
-  /* ── In-session history (persisted to sessionStorage) ── */
-  const [history, setHistory] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem('announce_history') || '[]') } catch { return [] }
-  })
+  /* ── Load history from DB (persists across refreshes and exec handoffs) ── */
+  useEffect(() => {
+    supabase
+      .from('announcement_history')
+      .select('id, text, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setHistory(data)
+        setHistoryLoading(false)
+      })
+  }, [])
 
-  function saveToHistory(text) {
-    const entry = { text, ts: new Date().toISOString() }
-    const updated = [entry, ...history.filter(h => h.text !== text)].slice(0, 20)
-    setHistory(updated)
-    try { sessionStorage.setItem('announce_history', JSON.stringify(updated)) } catch {}
+  async function saveToHistory(text) {
+    const { data } = await supabase
+      .from('announcement_history')
+      .insert({ text })
+      .select('id, text, created_at')
+      .single()
+    if (data) setHistory(prev => [data, ...prev].slice(0, 50))
   }
 
-  function clearHistory() {
+  async function clearHistory() {
+    await supabase.from('announcement_history').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     setHistory([])
-    try { sessionStorage.removeItem('announce_history') } catch {}
   }
 
   function flash(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -94,7 +106,7 @@ export default function AnnouncePage() {
       .eq('id', 1)
     setBusy(false)
     if (error) { flash('Failed to publish: ' + error.message); return }
-    saveToHistory(text)
+    await saveToHistory(text)
     flash('Announcement published!')
     setDraft('')
   }
@@ -282,7 +294,12 @@ export default function AnnouncePage() {
             )}
           </div>
 
-          {history.length === 0 ? (
+          {historyLoading ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <Clock className="w-6 h-6 mb-2 animate-spin" style={{ color: LINE }} />
+              <p className="text-xs" style={{ color: MUTED }}>Loading history…</p>
+            </div>
+          ) : history.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <Clock className="w-8 h-8 mb-3" style={{ color: LINE }} />
               <p className="text-sm font-medium" style={{ color: MUTED }}>No history yet</p>
@@ -290,8 +307,8 @@ export default function AnnouncePage() {
             </div>
           ) : (
             <div className="space-y-2 overflow-y-auto" style={{ maxHeight: '420px' }}>
-              {history.map((h, i) => (
-                <div key={i} className="rounded-xl p-3 group relative"
+              {history.map((h) => (
+                <div key={h.id} className="rounded-xl p-3 group relative"
                   style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
                   <div className="flex items-start gap-2 pr-8">
                     <Megaphone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: AMBER }} />
@@ -299,7 +316,7 @@ export default function AnnouncePage() {
                       <p className="text-xs leading-snug" style={{ color: INK }}>{h.text}</p>
                       <p className="text-[10px] mt-1.5 flex items-center gap-1" style={{ color: MUTED }}>
                         <Clock className="w-2.5 h-2.5 inline" />
-                        {fmtTime(h.ts)} · {timeSince(h.ts)}
+                        {fmtTime(h.created_at)} · {timeSince(h.created_at)}
                       </p>
                     </div>
                   </div>

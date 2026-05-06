@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Users, Clock, Activity, Layers , Link2, Copy, Download, Share2} from 'lucide-react'
+import { Users, Clock, Activity, Layers , Link2, Copy, Download, Share2, ScanLine } from 'lucide-react'
+import jsQR from 'jsqr'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError, getDeviceId } from '../lib/supabase.js'
 
 const G    = '#1B6B3A'
@@ -95,6 +96,13 @@ export default function Manager() {
   /* ── Auto-advance after registration ── */
   const [autoAdvance, setAutoAdvance] = useState(null) // null = off, 0–8 = countdown
   const resultQrRef = useRef(null)                     // ref to QR canvas in success card
+
+  /* ── State-code QR scanner ── */
+  const [showQRScanner, setShowQRScanner] = useState(false)
+  const [qrScanning,    setQrScanning]    = useState(false)
+  const videoRef       = useRef(null)
+  const canvasRef      = useRef(null)
+  const scanIntervalRef = useRef(null)
 
   const retryCount = useRef(0)
 
@@ -214,6 +222,55 @@ export default function Manager() {
     } else {
       setStateCodeError('')
     }
+  }
+
+  function startQRScan() {
+    setShowQRScanner(true)
+    setQrScanning(true)
+    setTimeout(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+          scanIntervalRef.current = setInterval(() => {
+            if (!videoRef.current || !canvasRef.current) return
+            const video = videoRef.current
+            const canvas = canvasRef.current
+            if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+            canvas.width = video.videoWidth
+            canvas.height = video.videoHeight
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            const code = jsQR(imageData.data, imageData.width, imageData.height)
+            if (code && code.data) {
+              // Extract state code from a /status/STATE_CODE URL
+              const match = code.data.match(/\/status\/([A-Z]{2}%2F\d{2}[A-Z]%2F\d+|[A-Z]{2}\/\d{2}[A-Z]\/\d+)/)
+              if (match) {
+                const scanned = decodeURIComponent(match[1])
+                stopQRScan()
+                setStateCode(scanned)
+                setStateCodeError('')
+              }
+            }
+          }, 250)
+        }
+      } catch {
+        setError('Could not access camera. Make sure camera permissions are allowed.')
+        setShowQRScanner(false)
+        setQrScanning(false)
+      }
+    }, 100)
+  }
+
+  function stopQRScan() {
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+    }
+    setShowQRScanner(false)
+    setQrScanning(false)
   }
 
   async function handleSubmit(e) {
@@ -376,6 +433,7 @@ export default function Manager() {
 
   /* ─── Main form layout ─── */
   return (
+    <>
     <div className="px-4 py-4 lg:px-8 lg:py-6 max-w-2xl mx-auto lg:max-w-6xl">
 
       {/* ── Page title ── */}
@@ -432,20 +490,32 @@ export default function Manager() {
 
               <label className="block">
                 <span className="text-sm font-semibold" style={{ color: INK }}>State code</span>
-                <input
-                  type="text" value={stateCode}
-                  onChange={(e) => { setStateCode(e.target.value.toUpperCase()); setStateCodeError('') }}
-                  onBlur={handleStateCodeBlur}
-                  onFocus={(e) => { setStateCodeError(''); e.target.style.borderColor = stateCodeError ? '#EF4444' : G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
-                  maxLength={20} autoComplete="off" autoCapitalize="characters"
-                  className="mt-1.5 w-full rounded-xl px-4 py-3 text-base font-mono tracking-wider outline-none transition-all"
-                  style={{
-                    border: `1.5px solid ${stateCodeError ? '#EF4444' : LINE}`,
-                    color: INK, backgroundColor: '#F8FAFC',
-                  }}
-                  placeholder="LA/24A/1234"
-                  disabled={busy}
-                />
+                <div className="flex gap-2 mt-1.5">
+                  <input
+                    type="text" value={stateCode}
+                    onChange={(e) => { setStateCode(e.target.value.toUpperCase()); setStateCodeError('') }}
+                    onBlur={handleStateCodeBlur}
+                    onFocus={(e) => { setStateCodeError(''); e.target.style.borderColor = stateCodeError ? '#EF4444' : G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
+                    maxLength={20} autoComplete="off" autoCapitalize="characters"
+                    className="flex-1 rounded-xl px-4 py-3 text-base font-mono tracking-wider outline-none transition-all"
+                    style={{
+                      border: `1.5px solid ${stateCodeError ? '#EF4444' : LINE}`,
+                      color: INK, backgroundColor: '#F8FAFC',
+                    }}
+                    placeholder="LA/24A/1234"
+                    disabled={busy}
+                  />
+                  <button
+                    type="button"
+                    onClick={startQRScan}
+                    disabled={busy}
+                    title="Scan QR code"
+                    className="px-3 rounded-xl transition-colors active:opacity-70 disabled:opacity-40 flex-shrink-0"
+                    style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1.5px solid rgba(27,107,58,0.2)` }}
+                  >
+                    <ScanLine className="w-5 h-5" />
+                  </button>
+                </div>
                 {stateCodeError && (
                   <p className="text-red-600 text-xs font-semibold mt-1">{stateCodeError}</p>
                 )}
@@ -658,5 +728,37 @@ export default function Manager() {
         </div>
       </div>
     </div>
+
+    {/* ── QR Scanner modal (outside main div, inside fragment) ── */}
+    {showQRScanner && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+        onClick={stopQRScan}
+      >
+        <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl"
+          onClick={e => e.stopPropagation()}>
+          <h2 className="text-lg font-extrabold mb-1" style={{ color: INK }}>Scan State-Code QR</h2>
+          <p className="text-xs mb-3" style={{ color: MUTED }}>Point camera at a corps member's status QR code to fill the state code field.</p>
+          <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
+            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+            <canvas ref={canvasRef} className="hidden" />
+            <div className="absolute inset-0 border-4 border-white/30 rounded-xl pointer-events-none" />
+            {qrScanning && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                Scanning…
+              </div>
+            )}
+          </div>
+          <button
+            onClick={stopQRScan}
+            className="w-full mt-3 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+            style={{ backgroundColor: '#F1F5F9', color: INK }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
