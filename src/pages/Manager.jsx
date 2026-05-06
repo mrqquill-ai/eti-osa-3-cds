@@ -92,6 +92,10 @@ export default function Manager() {
   const [currentBatch,setCurrentBatch]= useState(0)   // wave currently being served
   const [newIds,      setNewIds]      = useState(new Set())
 
+  /* ── Auto-advance after registration ── */
+  const [autoAdvance, setAutoAdvance] = useState(null) // null = off, 0–8 = countdown
+  const resultQrRef = useRef(null)                     // ref to QR canvas in success card
+
   const retryCount = useRef(0)
 
   /* ── Poll registration_open + heartbeat ── */
@@ -167,8 +171,17 @@ export default function Manager() {
 
   function reset() {
     setFullName(''); setStateCode(''); setError(''); setStateCodeError('')
-    setResult(null); setCopied(false); setDuplicateCode('')
+    setResult(null); setCopied(false); setDuplicateCode(''); setAutoAdvance(null)
   }
+
+  /* ── Countdown tick: decrement every second, reset at 0 ── */
+  useEffect(() => {
+    if (autoAdvance === null) return
+    if (autoAdvance === 0) { reset(); return }
+    const t = setTimeout(() => setAutoAdvance(n => n - 1), 1000)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAdvance])
 
   async function handleLookup() {
     const code = normalizeStateCode(lookupCode)
@@ -232,7 +245,7 @@ export default function Manager() {
           } else setError(msg || 'Could not register. Try again.')
           setBusy(false); return
         }
-        setResult(data); saveRecent(data); setBusy(false)
+        setResult(data); saveRecent(data); setBusy(false); setAutoAdvance(8)
       } catch (err) {
         if (retryCount.current < 3) { retryCount.current += 1; setError(`Connection lost. Retrying... (${retryCount.current}/3)`); setTimeout(attempt, 2000 * retryCount.current); return }
         setError(err.message || 'Network error. Try again.')
@@ -295,8 +308,8 @@ export default function Manager() {
           </div>
 
           <div className="mt-6 flex flex-col items-center">
-            <div className="bg-white p-3 rounded-lg border border-slate-200">
-              <QRCodeCanvas value={statusUrl} size={196} includeMargin={false} />
+            <div ref={resultQrRef} className="bg-white p-3 rounded-lg border border-slate-200">
+              <QRCodeCanvas value={statusUrl} size={220} level="M" includeMargin={false} />
             </div>
             <p className="text-xs text-slate-600 mt-2 text-center">Corps member scans this with their phone to track status.</p>
             <div className="flex items-center gap-2 mt-2">
@@ -310,8 +323,10 @@ export default function Manager() {
                 WhatsApp
               </a>
               <button onClick={() => {
-                const printWin = window.open('', '_blank', 'width=400,height=500')
-                printWin.document.write(`<html><head><title>Queue Ticket</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h1{font-size:18px;margin:0}h2{font-size:48px;margin:10px 0}.info{font-size:14px;color:#555;margin:4px 0}.line{border-top:1px dashed #ccc;margin:15px 0}</style></head><body><h1>Eti-Osa 3 Special CDS</h1><div class="line"></div><div class="info">${result.full_name}</div><div class="info" style="font-family:monospace">${result.state_code}</div><div class="line"></div><div class="info">QUEUE NUMBER</div><h2>#${result.queue_number}</h2><div class="info">Wave ${result.batch_number}</div><div class="line"></div><div class="info" style="font-size:11px">Track status: ${statusUrl}</div></body></html>`)
+                const canvas = resultQrRef.current?.querySelector('canvas')
+                const qrDataUrl = canvas ? canvas.toDataURL('image/png') : null
+                const printWin = window.open('', '_blank', 'width=400,height=600')
+                printWin.document.write(`<html><head><title>Queue Ticket</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h1{font-size:18px;margin:0}h2{font-size:48px;margin:10px 0}.info{font-size:14px;color:#555;margin:4px 0}.line{border-top:1px dashed #ccc;margin:15px 0}</style></head><body><h1>Eti-Osa 3 Special CDS</h1><div class="line"></div><div class="info">${result.full_name}</div><div class="info" style="font-family:monospace">${result.state_code}</div><div class="line"></div><div class="info">QUEUE NUMBER</div><h2>#${result.queue_number}</h2><div class="info">Wave ${result.batch_number}</div><div class="line"></div>${qrDataUrl ? `<img src="${qrDataUrl}" style="width:180px;height:180px;display:block;margin:12px auto" /><div class="info" style="font-size:11px">Scan for live status</div>` : `<div class="info" style="font-size:11px">Track status: ${statusUrl}</div>`}</body></html>`)
                 printWin.document.close(); printWin.print()
               }} className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors">
                 Print
@@ -319,10 +334,24 @@ export default function Manager() {
             </div>
           </div>
 
-          <button onClick={reset}
-            className="w-full mt-6 text-white font-bold py-4 rounded-xl text-lg transition-colors active:opacity-80"
-            style={{ backgroundColor: G }}>
-            Next corps member →
+          {/* Auto-advance countdown bar */}
+          {autoAdvance !== null && (
+            <div className="mt-4 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#E2E8F0' }}>
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{ width: `${(autoAdvance / 8) * 100}%`, backgroundColor: G }}
+              />
+            </div>
+          )}
+
+          <button
+            onClick={() => { setAutoAdvance(null); reset() }}
+            className="w-full mt-3 text-white font-bold py-4 rounded-xl text-base transition-colors active:opacity-80"
+            style={{ backgroundColor: G }}
+          >
+            {autoAdvance !== null
+              ? `Next corps member (${autoAdvance}s) →`
+              : 'Next corps member →'}
           </button>
         </div>
       </div>

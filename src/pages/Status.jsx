@@ -10,6 +10,7 @@ export default function Status() {
   const [reg, setReg] = useState(null)
   const [settings, setSettings] = useState(null)
   const [batchMembers, setBatchMembers] = useState([])
+  const [servedTimes, setServedTimes] = useState([])   // for velocity calc
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const prevWaveServing = useRef(null)
@@ -20,16 +21,18 @@ export default function Status() {
 
     async function load() {
       setLoading(true)
-      const [{ data: r }, { data: s }] = await Promise.all([
+      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
         supabase
           .from('registrations')
           .select('*')
           .eq('state_code', code)
           .eq('voided', false)
           .maybeSingle(),
-        supabase.from('session_settings').select('*').eq('id', 1).single()
+        supabase.from('session_settings').select('*').eq('id', 1).single(),
+        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
       ])
       if (cancelled) return
+      if (vel) setServedTimes(vel.map(v => v.served_at))
       if (!r) {
         setNotFound(true)
       } else {
@@ -57,15 +60,17 @@ export default function Status() {
     if (!code || notFound) return
 
     const poll = async () => {
-      const [{ data: r }, { data: s }] = await Promise.all([
+      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
         supabase
           .from('registrations')
           .select('*')
           .eq('state_code', code)
           .eq('voided', false)
           .maybeSingle(),
-        supabase.from('session_settings').select('*').eq('id', 1).single()
+        supabase.from('session_settings').select('*').eq('id', 1).single(),
+        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
       ])
+      if (vel) setServedTimes(vel.map(v => v.served_at))
 
       if (!r) {
         setReg(null)
@@ -108,10 +113,12 @@ export default function Status() {
     if (settings.current_batch !== reg.batch_number) return
     // Wave is active — add a faster poll on top of the 30s one
     const fastPoll = setInterval(async () => {
-      const [{ data: r }, { data: s }] = await Promise.all([
+      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
         supabase.from('registrations').select('*').eq('state_code', code).eq('voided', false).maybeSingle(),
-        supabase.from('session_settings').select('*').eq('id', 1).single()
+        supabase.from('session_settings').select('*').eq('id', 1).single(),
+        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
       ])
+      if (vel) setServedTimes(vel.map(v => v.served_at))
       if (r) setReg(r)
       if (s) setSettings(s)
       if (r) {
@@ -190,6 +197,19 @@ export default function Status() {
   const isBeingServed = !isCleared && currentBatch > 0 && reg.batch_number === currentBatch
   const batchesAhead = currentBatch > 0 ? Math.max(0, reg.batch_number - currentBatch) : reg.batch_number
 
+  // Velocity-based wait estimate — same approach as Stats page
+  const servedPerHour = useMemo(() => {
+    if (servedTimes.length < 2) return 0
+    const sorted = [...servedTimes].sort((a, b) => new Date(a) - new Date(b))
+    const firstAt = new Date(sorted[0])
+    const hoursElapsed = (Date.now() - firstAt) / (1000 * 60 * 60)
+    return hoursElapsed > 0.02 ? Math.round(servedTimes.length / hoursElapsed) : 0
+  }, [servedTimes])
+
+  const estimatedMins = servedPerHour > 0 && batchesAhead > 0
+    ? Math.round((batchesAhead * (settings?.batch_size ?? 30)) / servedPerHour * 60)
+    : null
+
   let statusBlock
   if (isCleared) {
     statusBlock = (
@@ -218,9 +238,15 @@ export default function Status() {
         <div className="text-sm mt-1" style={{ color: '#64748B' }}>
           Wave {currentBatch} is being served now{' \u2014 '}{batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
         </div>
-        {batchesAhead > 0 && (
-          <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>Estimated wait: ~{batchesAhead * 10}{'\u2013'}{batchesAhead * 15} minutes</div>
-        )}
+        {estimatedMins !== null ? (
+          <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+            ~{estimatedMins} min at current pace
+          </div>
+        ) : batchesAhead > 0 ? (
+          <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>
+            Check back shortly for a time estimate
+          </div>
+        ) : null}
       </div>
     )
   } else {
