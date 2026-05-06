@@ -159,6 +159,16 @@ export default function Status() {
     return () => supabase.removeChannel(ch)
   }, [reg])
 
+  // ── useMemo MUST be before all early returns (Rules of Hooks) ──
+  // servedPerHour only uses servedTimes (always an array), safe to call unconditionally.
+  const servedPerHour = useMemo(() => {
+    if (servedTimes.length < 2) return 0
+    const sorted = [...servedTimes].sort((a, b) => new Date(a) - new Date(b))
+    const firstAt = new Date(sorted[0])
+    const hoursElapsed = (Date.now() - firstAt) / (1000 * 60 * 60)
+    return hoursElapsed > 0.02 ? Math.round(servedTimes.length / hoursElapsed) : 0
+  }, [servedTimes])
+
   if (loading) {
     return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
   }
@@ -196,15 +206,6 @@ export default function Status() {
   const isCleared = !!reg.served_at
   const isBeingServed = !isCleared && currentBatch > 0 && reg.batch_number === currentBatch
   const batchesAhead = currentBatch > 0 ? Math.max(0, reg.batch_number - currentBatch) : reg.batch_number
-
-  // Velocity-based wait estimate — same approach as Stats page
-  const servedPerHour = useMemo(() => {
-    if (servedTimes.length < 2) return 0
-    const sorted = [...servedTimes].sort((a, b) => new Date(a) - new Date(b))
-    const firstAt = new Date(sorted[0])
-    const hoursElapsed = (Date.now() - firstAt) / (1000 * 60 * 60)
-    return hoursElapsed > 0.02 ? Math.round(servedTimes.length / hoursElapsed) : 0
-  }, [servedTimes])
 
   const estimatedMins = servedPerHour > 0 && batchesAhead > 0
     ? Math.round((batchesAhead * (settings?.batch_size ?? 30)) / servedPerHour * 60)
