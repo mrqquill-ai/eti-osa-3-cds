@@ -153,10 +153,10 @@ export default function Dashboard() {
     events.forEach((e) => window.addEventListener(e, resetTimer))
     const check = setInterval(() => {
       const idle = Date.now() - lastActivityRef.current
-      if (idle > 15 * 60 * 1000) {
+      if (idle > 60 * 60 * 1000) {
         supabase.auth.signOut()   // triggers onAuthStateChange → navigate to /login
         setTimeoutWarning(false)
-      } else if (idle > 13 * 60 * 1000) {
+      } else if (idle > 58 * 60 * 1000) {
         setTimeoutWarning(true)
       }
     }, 10000)
@@ -905,7 +905,7 @@ export default function Dashboard() {
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-4 pb-0.5">
         <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}>
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F59B0A' }} />
-          Wave {settings?.batch_size ?? '—'}
+          Size: {settings?.batch_size ?? '—'}/wave
         </span>
         <span
           className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
@@ -986,7 +986,7 @@ export default function Dashboard() {
               style={{ backgroundColor: '#F1F5F9', color: '#475569' }}
             >
               <ChevronLeft className="w-4 h-4" />
-              Go back
+              Undo wave call
             </button>
           )}
           <div className="flex-1" />
@@ -1037,7 +1037,7 @@ export default function Dashboard() {
           style={{ backgroundColor: '#F1F5F9', color: '#475569' }}
         >
           <ChevronLeft className="w-4 h-4" />
-          Go back to Wave {settings.current_batch - 1 === 0 ? 'start' : settings.current_batch - 1}
+          Undo last wave call
         </button>
       )}
 
@@ -1046,7 +1046,7 @@ export default function Dashboard() {
         {[
           { label: 'Wave',       value: currentWave > 0 ? `W${currentWave}` : '—', color: '#92400E', bg: 'rgba(245,155,10,0.08)' },
           { label: 'Registered', value: counts.registered, color: '#1B6B3A',  bg: 'rgba(27,107,58,0.06)'  },
-          { label: 'Waiting',    value: counts.waiting,    color: '#1D4ED8',  bg: 'rgba(29,78,216,0.06)'  },
+          { label: 'Waiting',    value: counts.waiting,    color: '#F59B0A',  bg: 'rgba(245,155,10,0.08)' },
           { label: 'Served',     value: counts.served,     color: '#166534',  bg: 'rgba(22,101,52,0.06)'  },
         ].map(({ label, value, color, bg }) => (
           <div key={label} className="rounded-xl px-2 py-2 text-center" style={{ backgroundColor: bg, border: '1px solid rgba(0,0,0,0.06)' }}>

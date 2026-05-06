@@ -351,8 +351,8 @@ export default function Join() {
           You need to allow location access to join the queue.
         </p>
         <ul className="text-slate-700 text-sm text-left mt-2 space-y-1 list-disc pl-5">
-          <li><strong>iPhone:</strong> Settings {'\u2192'} Safari {'\u2192'} Location {'\u2192'} Allow</li>
-          <li><strong>Android:</strong> Tap the lock icon in the address bar {'\u2192'} Permissions {'\u2192'} Location {'\u2192'} Allow</li>
+          <li><strong>iPhone:</strong> Settings {'\u2192'} Privacy {'&'} Security {'\u2192'} Location Services {'\u2192'} Safari Websites {'\u2192'} Allow</li>
+          <li><strong>Android:</strong> Tap the lock icon in the address bar {'\u2192'} Site settings {'\u2192'} Location {'\u2192'} Allow</li>
         </ul>
         <button
           onClick={checkLocation}

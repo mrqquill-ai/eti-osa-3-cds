@@ -87,9 +87,10 @@ export default function Manager() {
   }
 
   /* ── Live feed (desktop right panel) ── */
-  const [liveRegs,   setLiveRegs]   = useState([])   // recent registrations from DB
-  const [liveStats,  setLiveStats]  = useState({ total: 0, waiting: 0, wave: 1, served: 0 })
-  const [newIds,     setNewIds]     = useState(new Set()) // IDs that just arrived (pulse)
+  const [liveRegs,    setLiveRegs]    = useState([])
+  const [liveStats,   setLiveStats]   = useState({ total: 0, waiting: 0, served: 0 })
+  const [currentBatch,setCurrentBatch]= useState(0)   // wave currently being served
+  const [newIds,      setNewIds]      = useState(new Set())
 
   const retryCount = useRef(0)
 
@@ -100,10 +101,13 @@ export default function Manager() {
       try {
         const { data } = await supabase
           .from('session_settings')
-          .select('registration_open')
+          .select('registration_open, current_batch')
           .eq('id', 1)
           .single()
-        if (!cancelled && data) setRegistrationOpen(data.registration_open)
+        if (!cancelled && data) {
+          setRegistrationOpen(data.registration_open)
+          setCurrentBatch(data.current_batch ?? 0)
+        }
       } catch {}
       try { await supabase.rpc('exec_heartbeat', { p_device_id: getDeviceId() || 'unknown', p_page: 'manager' }) } catch {}
     }
@@ -132,8 +136,7 @@ export default function Manager() {
         const total   = all.length
         const served  = all.filter(r => r.status === 'served').length
         const waiting = all.filter(r => r.status === 'waiting').length
-        const wave    = all.length > 0 ? Math.max(...all.map(r => r.batch_number)) : 1
-        setLiveStats({ total, waiting, wave, served })
+        setLiveStats({ total, waiting, served })
       }
     }
     fetchFeed()
@@ -151,7 +154,7 @@ export default function Manager() {
           ...prev,
           total:   prev.total + 1,
           waiting: prev.waiting + 1,
-          wave:    Math.max(prev.wave, n.batch_number),
+          // currentBatch is tracked separately from session_settings poll
         }))
       })
       .on('postgres_changes', {
@@ -358,7 +361,7 @@ export default function Manager() {
           { icon: Users,    label: 'Registered',  value: liveStats.total,   color: G },
           { icon: Clock,    label: 'Waiting',      value: liveStats.waiting, color: '#1D4ED8' },
           { icon: Activity, label: 'Served',        value: liveStats.served,  color: '#166534' },
-          { icon: Layers,   label: 'Current Wave', value: `W${liveStats.wave}`, color: '#92400E' },
+          { icon: Layers,   label: 'Now Serving',  value: currentBatch > 0 ? `Wave ${currentBatch}` : '—', color: '#92400E' },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3" style={{ border: `1px solid ${LINE}` }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
