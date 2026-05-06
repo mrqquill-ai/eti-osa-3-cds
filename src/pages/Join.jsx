@@ -536,7 +536,7 @@ export default function Join() {
       {/* Already registered lookup */}
       <div className="mt-4 bg-white rounded-2xl shadow border border-slate-200 p-4">
         <p className="text-sm font-semibold text-slate-700 text-center">Already registered?</p>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-col gap-2">
           <input
             type="text"
             value={lookupCode}
@@ -544,13 +544,13 @@ export default function Join() {
             maxLength={20}
             autoComplete="off"
             autoCapitalize="characters"
-            className="flex-1 rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-2.5 text-sm font-mono tracking-wider"
+            className="w-full rounded-lg border-2 border-slate-300 focus:border-emerald-700 focus:outline-none px-3 py-2.5 text-sm font-mono tracking-wider"
             placeholder="Enter state code"
           />
           <button
             onClick={handleLookup}
             disabled={lookupBusy || !lookupCode.trim()}
-            className="bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold px-4 py-2.5 rounded-lg text-sm whitespace-nowrap"
+            className="w-full bg-slate-700 hover:bg-slate-800 disabled:bg-slate-400 text-white font-bold px-4 py-2.5 rounded-lg text-sm"
           >
             {lookupBusy ? 'Checking...' : 'Check status'}
           </button>
