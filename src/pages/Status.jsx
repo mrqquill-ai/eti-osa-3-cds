@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 // lucide icons removed — using emoji for status states
 import { supabase } from '../lib/supabase.js'
 
@@ -355,6 +356,24 @@ export default function Status() {
           </div>
         </div>
       )}
+
+      {/* QR Code card — corps member saves this for future sessions */}
+      <div className="bg-white rounded-2xl shadow border border-slate-200 mt-4 p-5 flex flex-col items-center">
+        <div className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-3">Your QR Code</div>
+        <div className="p-3 bg-white rounded-xl border-2 border-slate-200">
+          <QRCodeSVG
+            value={`${window.location.origin}/status/${encodeURIComponent(reg.state_code)}`}
+            size={180}
+            bgColor="#ffffff"
+            fgColor="#1B6B3A"
+            level="M"
+          />
+        </div>
+        <div className="mt-3 font-mono text-sm font-bold text-slate-700 tracking-wider">{reg.state_code}</div>
+        <div className="mt-2 text-center text-xs text-slate-500 leading-relaxed max-w-[220px]">
+          📸 Screenshot and save this. Show it to the exec at every future CDS session — no need to type your state code again.
+        </div>
+      </div>
 
       <p className="text-[11px] text-slate-500 text-center mt-4 mb-6">
         This page refreshes automatically. Keep it open.
