@@ -98,11 +98,10 @@ export default function Manager() {
   const resultQrRef = useRef(null)                     // ref to QR canvas in success card
 
   /* ── State-code QR scanner ── */
-  const [showQRScanner,  setShowQRScanner]  = useState(false)
-  const [qrScanning,     setQrScanning]     = useState(false)
-  const [nameLookupBusy, setNameLookupBusy] = useState(false)
-  const videoRef        = useRef(null)
-  const canvasRef       = useRef(null)
+  const [showQRScanner, setShowQRScanner] = useState(false)
+  const [qrScanning,    setQrScanning]    = useState(false)
+  const videoRef       = useRef(null)
+  const canvasRef      = useRef(null)
   const scanIntervalRef = useRef(null)
 
   const retryCount = useRef(0)
@@ -253,7 +252,6 @@ export default function Manager() {
                 stopQRScan()
                 setStateCode(scanned)
                 setStateCodeError('')
-                lookupNameForCode(scanned)
               }
             }
           }, 250)
@@ -273,23 +271,6 @@ export default function Manager() {
     }
     setShowQRScanner(false)
     setQrScanning(false)
-  }
-
-  async function lookupNameForCode(code) {
-    const normalized = normalizeStateCode(code)
-    if (!normalized || !STATE_CODE_REGEX.test(normalized)) return
-    setNameLookupBusy(true)
-    try {
-      const { data } = await supabase
-        .from('registrations')
-        .select('full_name')
-        .eq('state_code', normalized)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (data?.full_name) setFullName(data.full_name)
-    } catch {}
-    setNameLookupBusy(false)
   }
 
   async function handleSubmit(e) {
@@ -493,12 +474,7 @@ export default function Manager() {
             <h2 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: MUTED }}>Register corps member</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <label className="block">
-                <span className="text-sm font-semibold flex items-center gap-2" style={{ color: INK }}>
-                  Full name
-                  {nameLookupBusy && (
-                    <span className="text-xs font-normal" style={{ color: MUTED }}>Looking up…</span>
-                  )}
-                </span>
+                <span className="text-sm font-semibold" style={{ color: INK }}>Full name</span>
                 <input
                   type="text" value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -518,7 +494,7 @@ export default function Manager() {
                   <input
                     type="text" value={stateCode}
                     onChange={(e) => { setStateCode(e.target.value.toUpperCase()); setStateCodeError('') }}
-                    onBlur={(e) => { handleStateCodeBlur(e); lookupNameForCode(stateCode) }}
+                    onBlur={handleStateCodeBlur}
                     onFocus={(e) => { setStateCodeError(''); e.target.style.borderColor = stateCodeError ? '#EF4444' : G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
                     maxLength={20} autoComplete="off" autoCapitalize="characters"
                     className="flex-1 rounded-xl px-4 py-3 text-base font-mono tracking-wider outline-none transition-all"
