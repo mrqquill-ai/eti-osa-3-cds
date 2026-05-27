@@ -24,6 +24,7 @@ const INITIAL = {
 
 export default function Signup() {
   const [form,        setForm]        = useState(INITIAL)
+  const [customRole,  setCustomRole]  = useState('')
   const [showPw,      setShowPw]      = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading,     setLoading]     = useState(false)
@@ -38,6 +39,10 @@ export default function Signup() {
 
     if (!form.role) {
       setError('Please select your role before continuing.')
+      return
+    }
+    if (form.role === 'other' && !customRole.trim()) {
+      setError('Please enter your role.')
       return
     }
     if (form.password.length < 8) {
@@ -58,7 +63,7 @@ export default function Signup() {
           data: {
             full_name:  form.fullName,
             state_code: form.stateCode,
-            role:       form.role,
+            role:       form.role === 'other' ? customRole.trim() : form.role,
           }
         }
       })
@@ -204,7 +209,7 @@ export default function Signup() {
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => set('role', r.id)}
+                  onClick={() => { set('role', r.id); setCustomRole('') }}
                   className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 border"
                   style={{
                     backgroundColor: active ? 'rgba(201,151,58,0.1)' : 'white',
@@ -222,6 +227,19 @@ export default function Signup() {
               )
             })}
           </div>
+
+          {/* Custom role input — shown only when Other is selected */}
+          {form.role === 'other' && (
+            <input
+              type="text"
+              autoFocus
+              value={customRole}
+              onChange={e => setCustomRole(e.target.value)}
+              placeholder="Enter your role e.g. Assistant Welfare Officer"
+              maxLength={80}
+              className="auth-input mt-2"
+            />
+          )}
         </div>
 
         {/* Password */}
