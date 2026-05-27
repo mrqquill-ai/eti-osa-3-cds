@@ -7,10 +7,10 @@ const G    = '#1B6B3A'
 const GOLD = '#C9973A'
 
 const ROLES = [
-  { id: 'executive',  label: 'Group Executive' },
-  { id: 'welfare',    label: 'Welfare Officer' },
-  { id: 'pro',        label: 'PRO' },
-  { id: 'other',      label: 'Other' },
+  { id: 'president',     label: 'President' },
+  { id: 'pro',           label: 'PRO' },
+  { id: 'entry_officer', label: 'Entry Officer' },
+  { id: 'other',         label: 'Other' },
 ]
 
 const INITIAL = {
