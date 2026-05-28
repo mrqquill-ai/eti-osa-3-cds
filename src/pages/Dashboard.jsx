@@ -38,6 +38,8 @@ export default function Dashboard() {
     const [unlocked, setUnlocked] = useState(false)
   const [role, setRole] = useState('executive')
   const isSuperAdmin = role === 'super_admin'
+  const [userName, setUserName] = useState('')
+  const [userRole, setUserRole] = useState('')
   // Legacy PIN state (kept for manual super-admin pin entry flow)
     
   // Super admin modals
@@ -130,6 +132,8 @@ export default function Dashboard() {
       const meta = session.user?.user_metadata || {}
       const detectedRole = meta.role === 'super_admin' ? 'super_admin' : 'executive'
       setRole(detectedRole)
+      setUserName(meta.full_name || '')
+      setUserRole(meta.role || '')
 
 
 
@@ -885,6 +889,34 @@ export default function Dashboard() {
         <div className="mb-3 rounded-xl p-3 flex items-center gap-2 animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
           <span className="text-sm font-semibold" style={{ color: '#92640A' }}>Session will lock in ~2 minutes. Tap anywhere to stay logged in.</span>
+        </div>
+      )}
+
+      {/* ── Personalised greeting ── */}
+      {userName && (
+        <div className="mb-4 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3"
+          style={{ background: 'linear-gradient(135deg, #1B6B3A 0%, #14532D 100%)' }}>
+          <div>
+            <div className="text-white font-extrabold text-base leading-tight">
+              {(() => {
+                const h = new Date().getHours()
+                const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+                const firstName = userName.split(' ')[0]
+                return `${greeting}, ${firstName} 👋`
+              })()}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)' }}>
+                {isSuperAdmin ? '⚡ Super Admin' : userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1).replace(/_/g, ' ') : 'Executive'}
+              </span>
+              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>· Eti-Osa 3 Special CDS</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-extrabold flex-shrink-0"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#fff' }}>
+            {userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
         </div>
       )}
 
