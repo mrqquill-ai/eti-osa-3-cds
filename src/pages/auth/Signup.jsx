@@ -60,6 +60,7 @@ export default function Signup() {
         email: form.email,
         password: form.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/login`,
           data: {
             full_name:  form.fullName,
             state_code: form.stateCode,
