@@ -98,8 +98,9 @@ export default function Manager() {
   const resultQrRef = useRef(null)                     // ref to QR canvas in success card
 
   /* ── State-code QR scanner ── */
-  const [showQRScanner, setShowQRScanner] = useState(false)
-  const [qrScanning,    setQrScanning]    = useState(false)
+  const [showQRScanner,   setShowQRScanner]   = useState(false)
+  const [qrScanning,      setQrScanning]      = useState(false)
+  const [showJoinQR,      setShowJoinQR]      = useState(false)
   const videoRef       = useRef(null)
   const canvasRef      = useRef(null)
   const scanIntervalRef = useRef(null)
@@ -583,10 +584,10 @@ export default function Manager() {
           <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
             <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in Link</h2>
             <p className="text-xs mb-4" style={{ color: MUTED }}>
-              Share this link or QR code with corps members so they can join the queue from their phones.
+              Show the QR code for corps members to scan and join the queue from their own phones.
             </p>
 
-            {/* QR Code */}
+            {/* QR Code + Show button */}
             <div className="flex flex-col items-center gap-3">
               <div
                 ref={linkQrRef}
@@ -602,6 +603,19 @@ export default function Manager() {
                   includeMargin={false}
                 />
               </div>
+
+              {/* Present / fullscreen button */}
+              <button
+                onClick={() => setShowJoinQR(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-colors active:opacity-70"
+                style={{ backgroundColor: G, color: '#fff' }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
+                </svg>
+                Show QR — Corps Member Scan
+              </button>
+
               <button
                 onClick={downloadQR}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:opacity-70"
@@ -728,6 +742,48 @@ export default function Manager() {
         </div>
       </div>
     </div>
+
+    {/* ── Fullscreen Join QR modal ── */}
+    {showJoinQR && (
+      <div
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+        style={{ backgroundColor: '#1B6B3A' }}
+        onClick={() => setShowJoinQR(false)}
+      >
+        <div className="text-white text-center mb-6 px-4">
+          <div className="text-2xl font-extrabold tracking-tight">Eti-Osa 3 Special CDS</div>
+          <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.75)' }}>
+            Scan to join the queue
+          </div>
+        </div>
+
+        <div className="p-5 rounded-3xl" style={{ backgroundColor: '#fff' }}
+          onClick={e => e.stopPropagation()}>
+          <QRCodeCanvas
+            value={joinUrl}
+            size={260}
+            bgColor="#ffffff"
+            fgColor="#1B6B3A"
+            level="H"
+            includeMargin={false}
+          />
+        </div>
+
+        <div className="mt-6 text-center px-6">
+          <div className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            {joinUrl}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowJoinQR(false)}
+          className="mt-8 px-8 py-3 rounded-2xl font-bold text-sm"
+          style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#fff' }}
+        >
+          Close
+        </button>
+      </div>
+    )}
 
     {/* ── QR Scanner modal (outside main div, inside fragment) ── */}
     {showQRScanner && (
