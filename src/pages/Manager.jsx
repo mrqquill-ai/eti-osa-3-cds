@@ -769,12 +769,6 @@ export default function Manager() {
           />
         </div>
 
-        <div className="mt-6 text-center px-6">
-          <div className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            {joinUrl}
-          </div>
-        </div>
-
         <button
           onClick={() => setShowJoinQR(false)}
           className="mt-8 px-8 py-3 rounded-2xl font-bold text-sm"
