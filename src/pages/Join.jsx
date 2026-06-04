@@ -153,7 +153,14 @@ export default function Join() {
   // Without the await, checkLocation fires before fetchSettings returns and uses the
   // hardcoded defaults, causing a false "too far" on every page load / refresh.
   useEffect(() => {
-    fetchSettings().then(() => checkLocation())
+    fetchSettings().then((data) => {
+      // If geofencing is off, allow immediately — no GPS needed
+      if (!data?.geofencing_enabled) {
+        setGeoState('allowed')
+      } else {
+        checkLocation()
+      }
+    })
   }, [fetchSettings, checkLocation])
 
   // Lookup existing registration

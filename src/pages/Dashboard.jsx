@@ -134,6 +134,7 @@ export default function Dashboard() {
       setRole(detectedRole)
       setUserName(meta.full_name || '')
       setUserRole(meta.role || '')
+      if (detectedRole === 'super_admin') loadExecList()
 
 
 
@@ -1121,179 +1122,341 @@ export default function Dashboard() {
 
       {/* ═══ Super Admin panel — always visible ═══ */}
       <div className="space-y-3">
-          {/* Super Admin stub */}
-          {isSuperAdmin && (
-            <div className="rounded-xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
-              {/* Super admin header */}
-              <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#1B6B3A' }}>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-white" />
-                  <span className="text-white font-bold text-sm">Super Admin</span>
+          {/* ── Super Admin Panel ── */}
+          {isSuperAdmin && (() => {
+            const pendingCount = execList.filter(p => p.status === 'pending').length
+            const tabMeta = {
+              approvals:  { icon: '👤', label: 'Approvals',    desc: pendingCount > 0 ? `${pendingCount} pending` : 'Manage exec accounts' },
+              announce:   { icon: '📢', label: 'Announce',     desc: 'Broadcast to all members' },
+              log:        { icon: '📋', label: 'Activity',     desc: 'Recent admin actions' },
+              sessions:   { icon: '🔑', label: 'Sessions',     desc: 'Active exec logins' },
+              archives:   { icon: '🗄', label: 'Archives',     desc: 'Past session records' },
+              duplicates: { icon: '⚠️', label: 'Duplicates',   desc: 'Flag suspicious entries' },
+              venue:      { icon: '📍', label: 'Venue',        desc: 'Location & geofence' },
+            }
+            return (
+              <div className="rounded-2xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
+
+                {/* Header */}
+                <div className="px-4 py-3 flex items-center gap-3" style={{ backgroundColor: '#1B6B3A' }}>
+                  {superTab ? (
+                    <button onClick={() => setSuperTab(null)} className="flex items-center gap-1.5 text-white opacity-80 hover:opacity-100 transition-opacity">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                  ) : (
+                    <ShieldCheck className="w-4 h-4 text-white flex-shrink-0" />
+                  )}
+                  <span className="text-white font-bold text-sm flex-1">
+                    {superTab ? tabMeta[superTab]?.label : 'Super Admin'}
+                  </span>
+                  {pendingCount > 0 && !superTab && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EF4444', color: '#fff' }}>
+                      {pendingCount}
+                    </span>
+                  )}
                 </div>
-                {superTab && (
-                  <button
-                    onClick={() => setSuperTab(null)}
-                    className="text-white text-xs font-semibold opacity-80 hover:opacity-100"
-                  >
-                    ✕ Close
-                  </button>
+
+                {/* ── Home menu ── */}
+                {!superTab && (
+                  <div className="bg-white p-3 space-y-3">
+
+                    {/* Quick actions */}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#94A3B8' }}>Quick Actions</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['announce', 'venue'] ).map(key => (
+                          <button key={key} onClick={() => setSuperTab(key)}
+                            className="flex flex-col items-start gap-1 p-3 rounded-xl text-left transition-colors active:opacity-70"
+                            style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                            <span className="text-xl">{tabMeta[key].icon}</span>
+                            <span className="text-sm font-bold" style={{ color: '#0F172A' }}>{tabMeta[key].label}</span>
+                            <span className="text-[11px] leading-tight" style={{ color: '#94A3B8' }}>{tabMeta[key].desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Management list */}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#94A3B8' }}>Management</p>
+                      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E2E8F0' }}>
+                        {(['approvals', 'log', 'sessions', 'archives', 'duplicates']).map((key, i, arr) => (
+                          <button key={key} onClick={() => setSuperTab(key)}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-50"
+                            style={{ borderBottom: i < arr.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                            <span className="text-lg w-6 flex-shrink-0">{tabMeta[key].icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>{tabMeta[key].label}</div>
+                              <div className="text-[11px] mt-0.5" style={{ color: '#94A3B8' }}>{tabMeta[key].desc}</div>
+                            </div>
+                            {key === 'approvals' && pendingCount > 0 && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}>
+                                {pendingCount}
+                              </span>
+                            )}
+                            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: '#CBD5E1' }} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </div>
 
-              {/* Tab pills */}
-              <div className="flex gap-1.5 flex-wrap px-3 py-2.5 bg-white" style={{ borderBottom: '1px solid #E0DDD6' }}>
-                {[
-                  { key: 'approvals', label: '👤 Approvals' },
-                  { key: 'announce',  label: '📢 Announce'  },
-                  { key: 'log',       label: '📋 Activity'  },
-                  { key: 'sessions',  label: '🔑 Sessions'  },
-                  { key: 'archives',  label: '🗄 Archives'  },
-                  { key: 'duplicates',label: '⚠️ Duplicates'},
-                  { key: 'venue',     label: '📍 Venue'     },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setSuperTab(superTab === key ? null : key)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
-                    style={{
-                      backgroundColor: superTab === key ? '#1B6B3A' : '#F1F5F9',
-                      color:           superTab === key ? 'white'   : '#475569',
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+                {/* ── Approvals panel ── */}
+                {superTab === 'approvals' && (
+                  <div className="bg-white">
+                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Exec Access Requests</span>
+                      <button onClick={loadExecList} disabled={execListLoading} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>
+                        {execListLoading ? 'Loading…' : 'Refresh'}
+                      </button>
+                    </div>
+                    {execListLoading && <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>Loading…</div>}
+                    {!execListLoading && execList.length === 0 && <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>No exec accounts found.</div>}
+                    {!execListLoading && execList.length > 0 && (
+                      <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
+                        {execList.map(p => (
+                          <div key={p.id} className="px-4 py-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                                style={{
+                                  backgroundColor: p.status === 'approved' ? 'rgba(27,107,58,0.12)' : p.status === 'rejected' ? 'rgba(192,57,43,0.1)' : 'rgba(201,151,58,0.15)',
+                                  color: p.status === 'approved' ? '#1B6B3A' : p.status === 'rejected' ? '#C0392B' : '#A67C2E',
+                                }}>
+                                {(p.full_name || p.email || '?')[0].toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{p.full_name || '(no name)'}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
+                                    style={{
+                                      backgroundColor: p.status === 'approved' ? 'rgba(27,107,58,0.1)' : p.status === 'rejected' ? 'rgba(192,57,43,0.1)' : 'rgba(201,151,58,0.15)',
+                                      color: p.status === 'approved' ? '#1B6B3A' : p.status === 'rejected' ? '#C0392B' : '#A67C2E',
+                                    }}>
+                                    {p.status}
+                                  </span>
+                                </div>
+                                <div className="text-xs mt-0.5 truncate" style={{ color: '#64748B' }}>{p.email}</div>
+                                <div className="text-xs mt-0.5 font-mono" style={{ color: '#94A3B8' }}>{p.state_code || '—'} · {p.role}</div>
+                                {p.rejection_reason && <div className="text-xs mt-1 italic" style={{ color: '#C0392B' }}>Reason: {p.rejection_reason}</div>}
+                              </div>
+                            </div>
+                            {p.status === 'pending' && (
+                              <div className="flex gap-2 mt-2.5 pl-12">
+                                <button onClick={() => approveExec(p.id)} disabled={approvingId === p.id || rejectingId === p.id}
+                                  className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
+                                  style={{ backgroundColor: '#1B6B3A' }}>
+                                  {approvingId === p.id ? 'Approving…' : '✓ Approve'}
+                                </button>
+                                <button onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }} disabled={approvingId === p.id || rejectingId === p.id}
+                                  className="flex-1 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
+                                  style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}>
+                                  ✕ Reject
+                                </button>
+                              </div>
+                            )}
+                            {p.status === 'approved' && (
+                              <div className="mt-2.5 pl-12">
+                                <button onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }} disabled={rejectingId === p.id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-40"
+                                  style={{ backgroundColor: 'rgba(192,57,43,0.07)', color: '#C0392B' }}>
+                                  Revoke access
+                                </button>
+                              </div>
+                            )}
+                            {p.status === 'rejected' && (
+                              <div className="mt-2.5 pl-12">
+                                <button onClick={() => approveExec(p.id)} disabled={approvingId === p.id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity disabled:opacity-40"
+                                  style={{ backgroundColor: '#1B6B3A' }}>
+                                  {approvingId === p.id ? 'Approving…' : 'Reinstate'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {/* ── Approvals panel ── */}
-              {superTab === 'approvals' && (
-                <div className="bg-white">
-                  <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Exec Access Requests</span>
-                    <button onClick={loadExecList} disabled={execListLoading} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>
-                      {execListLoading ? 'Loading…' : 'Refresh'}
+                {/* ── Announce panel ── */}
+                {superTab === 'announce' && (
+                  <div className="bg-white p-4 space-y-3">
+                    <p className="text-xs" style={{ color: '#64748B' }}>This message appears as a banner on every corps member's status page.</p>
+                    <textarea
+                      value={announcement}
+                      onChange={e => setAnnouncement(e.target.value)}
+                      rows={3}
+                      maxLength={200}
+                      placeholder="e.g. Wave 3 is now being called. Please proceed to the clearance desk."
+                      className="w-full rounded-xl px-3.5 py-3 text-sm outline-none resize-none"
+                      style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }}
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={saveAnnouncement}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
+                        style={{ backgroundColor: '#1B6B3A' }}>
+                        {announcement ? 'Publish' : 'Clear announcement'}
+                      </button>
+                      {announcement && (
+                        <button onClick={() => { setAnnouncement(''); saveAnnouncement() }}
+                          className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80"
+                          style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}>
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Activity Log panel ── */}
+                {superTab === 'log' && (
+                  <div className="bg-white">
+                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Recent Actions</span>
+                      <button onClick={loadActivityLog} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
+                    </div>
+                    {activityLog.length === 0
+                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No activity yet.</div>
+                      : <div className="divide-y max-h-72 overflow-y-auto" style={{ borderColor: '#F1F5F9' }}>
+                          {activityLog.map((item, i) => (
+                            <div key={i} className="px-4 py-2.5 flex items-start gap-3">
+                              <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: '#1B6B3A' }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium" style={{ color: '#0F172A' }}>{item.action?.replace(/_/g, ' ')}</div>
+                                {item.details && <div className="text-xs mt-0.5" style={{ color: '#64748B' }}>{item.details}</div>}
+                              </div>
+                              <div className="text-[11px] flex-shrink-0" style={{ color: '#94A3B8' }}>
+                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                )}
+
+                {/* ── Sessions panel ── */}
+                {superTab === 'sessions' && (
+                  <div className="bg-white">
+                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Active Logins</span>
+                      <button onClick={loadExecSessions} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
+                    </div>
+                    {execSessions.length === 0
+                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No active sessions.</div>
+                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
+                          {execSessions.map((s, i) => (
+                            <div key={i} className="px-4 py-3 flex items-center justify-between">
+                              <div className="text-sm font-medium capitalize" style={{ color: '#0F172A' }}>{s.page?.replace('/', '') || 'Unknown page'}</div>
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
+                                {s.device_count} active
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                )}
+
+                {/* ── Archives panel ── */}
+                {superTab === 'archives' && (
+                  <div className="bg-white">
+                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Past Sessions</span>
+                      <button onClick={loadArchiveDates} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
+                    </div>
+                    {archiveDates.length === 0
+                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No archived sessions yet.</div>
+                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
+                          {archiveDates.map((a, i) => (
+                            <div key={i} className="px-4 py-3 flex items-center justify-between">
+                              <div className="text-sm font-medium" style={{ color: '#0F172A' }}>
+                                {new Date(a.session_date).toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                              </div>
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#F1F5F9', color: '#64748B' }}>
+                                {a.entry_count} members
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                )}
+
+                {/* ── Duplicates panel ── */}
+                {superTab === 'duplicates' && (
+                  <div className="bg-white">
+                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Duplicate Entries</span>
+                      <button onClick={loadDuplicates} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
+                    </div>
+                    {duplicates.length === 0
+                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No duplicates found.</div>
+                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
+                          {duplicates.map((d, i) => (
+                            <div key={i} className="px-4 py-3 flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}>
+                                <span className="text-sm">⚠️</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>{d.full_name}</div>
+                                <div className="text-xs font-mono mt-0.5" style={{ color: '#64748B' }}>{d.state_code}</div>
+                              </div>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}>
+                                ×{d.match_count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                )}
+
+                {/* ── Venue panel ── */}
+                {superTab === 'venue' && (
+                  <div className="bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                      <div>
+                        <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>Geofencing</div>
+                        <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Require corps members to be at venue</div>
+                      </div>
+                      <button onClick={() => setVenueGeoEnabled(v => !v)}
+                        className="w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                        style={{ backgroundColor: venueGeoEnabled ? '#1B6B3A' : '#CBD5E1' }}>
+                        <div className="w-4 h-4 bg-white rounded-full shadow transition-transform mx-1"
+                          style={{ transform: venueGeoEnabled ? 'translateX(18px)' : 'translateX(0)' }} />
+                      </button>
+                    </div>
+                    {venueGeoEnabled && (
+                      <div className="space-y-2">
+                        {[
+                          { label: 'Latitude', value: venueLat, set: setVenueLat, placeholder: '6.4360344' },
+                          { label: 'Longitude', value: venueLng, set: setVenueLng, placeholder: '3.523451' },
+                          { label: 'Radius (metres)', value: venueRadius, set: setVenueRadius, placeholder: '350' },
+                        ].map(({ label, value, set, placeholder }) => (
+                          <div key={label}>
+                            <label className="block text-xs font-semibold mb-1" style={{ color: '#64748B' }}>{label}</label>
+                            <input type="text" value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
+                              className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none font-mono"
+                              style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {venueSuccess && <div className="text-xs font-semibold text-center py-2 rounded-lg" style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}>{venueSuccess}</div>}
+                    <button onClick={saveVenueSettings}
+                      className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
+                      style={{ backgroundColor: '#1B6B3A' }}>
+                      Save venue settings
                     </button>
                   </div>
+                )}
 
-                  {execListLoading && (
-                    <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>Loading…</div>
-                  )}
-
-                  {!execListLoading && execList.length === 0 && (
-                    <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>No exec accounts found.</div>
-                  )}
-
-                  {!execListLoading && execList.length > 0 && (
-                    <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
-                      {execList.map(p => (
-                        <div key={p.id} className="px-4 py-3">
-                          <div className="flex items-start gap-3">
-                            {/* Avatar */}
-                            <div
-                              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                              style={{
-                                backgroundColor:
-                                  p.status === 'approved' ? 'rgba(27,107,58,0.12)' :
-                                  p.status === 'rejected' ? 'rgba(192,57,43,0.1)'  :
-                                  'rgba(201,151,58,0.15)',
-                                color:
-                                  p.status === 'approved' ? '#1B6B3A' :
-                                  p.status === 'rejected' ? '#C0392B' :
-                                  '#A67C2E',
-                              }}
-                            >
-                              {(p.full_name || p.email || '?')[0].toUpperCase()}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>
-                                  {p.full_name || '(no name)'}
-                                </span>
-                                {/* Status badge */}
-                                <span
-                                  className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
-                                  style={{
-                                    backgroundColor:
-                                      p.status === 'approved' ? 'rgba(27,107,58,0.1)'  :
-                                      p.status === 'rejected' ? 'rgba(192,57,43,0.1)'  :
-                                      'rgba(201,151,58,0.15)',
-                                    color:
-                                      p.status === 'approved' ? '#1B6B3A' :
-                                      p.status === 'rejected' ? '#C0392B' :
-                                      '#A67C2E',
-                                  }}
-                                >
-                                  {p.status}
-                                </span>
-                              </div>
-                              <div className="text-xs mt-0.5 truncate" style={{ color: '#64748B' }}>{p.email}</div>
-                              <div className="text-xs mt-0.5 font-mono" style={{ color: '#94A3B8' }}>
-                                {p.state_code || '—'} · {p.role}
-                              </div>
-                              {p.rejection_reason && (
-                                <div className="text-xs mt-1 italic" style={{ color: '#C0392B' }}>
-                                  Reason: {p.rejection_reason}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Action buttons */}
-                          {p.status === 'pending' && (
-                            <div className="flex gap-2 mt-2.5 pl-12">
-                              <button
-                                onClick={() => approveExec(p.id)}
-                                disabled={approvingId === p.id || rejectingId === p.id}
-                                className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: '#1B6B3A' }}
-                              >
-                                {approvingId === p.id ? 'Approving…' : '✓ Approve'}
-                              </button>
-                              <button
-                                onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }}
-                                disabled={approvingId === p.id || rejectingId === p.id}
-                                className="flex-1 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
-                              >
-                                ✕ Reject
-                              </button>
-                            </div>
-                          )}
-
-                          {p.status === 'approved' && (
-                            <div className="flex gap-2 mt-2.5 pl-12">
-                              <button
-                                onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }}
-                                disabled={rejectingId === p.id}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(192,57,43,0.07)', color: '#C0392B' }}
-                              >
-                                Revoke access
-                              </button>
-                            </div>
-                          )}
-
-                          {p.status === 'rejected' && (
-                            <div className="flex gap-2 mt-2.5 pl-12">
-                              <button
-                                onClick={() => approveExec(p.id)}
-                                disabled={approvingId === p.id}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: '#1B6B3A' }}
-                              >
-                                {approvingId === p.id ? 'Approving…' : 'Reinstate'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )
+          })()}
 
           {/* ── Reject / Revoke sheet ── */}
           {showRejectSheet && (
