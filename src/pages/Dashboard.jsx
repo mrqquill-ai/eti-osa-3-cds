@@ -52,7 +52,8 @@ export default function Dashboard() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
           
   // Super admin panel
-  const [superTab, setSuperTab] = useState(null) // null=collapsed, 'approvals','log','stats','announce','sessions','archives','duplicates','venue'
+  const [superTab, setSuperTab] = useState(null) // null=home menu, string=open panel
+  const [superOpen, setSuperOpen] = useState(false) // collapsed by default
   // Exec approvals
   const [execList,          setExecList]          = useState([])
   const [execListLoading,   setExecListLoading]   = useState(false)
@@ -1137,27 +1138,38 @@ export default function Dashboard() {
             return (
               <div className="rounded-2xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
 
-                {/* Header */}
-                <div className="px-4 py-3 flex items-center gap-3" style={{ backgroundColor: '#1B6B3A' }}>
-                  {superTab ? (
-                    <button onClick={() => setSuperTab(null)} className="flex items-center gap-1.5 text-white opacity-80 hover:opacity-100 transition-opacity">
+                {/* Header — click to expand/collapse */}
+                <button
+                  onClick={() => { setSuperOpen(o => !o); if (!superOpen) setSuperTab(null) }}
+                  className="w-full px-4 py-3 flex items-center gap-3 transition-opacity active:opacity-80"
+                  style={{ backgroundColor: '#1B6B3A' }}
+                >
+                  {superTab && superOpen ? (
+                    <button onClick={e => { e.stopPropagation(); setSuperTab(null) }} className="flex items-center gap-1.5 text-white opacity-80 hover:opacity-100 transition-opacity">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
                     </button>
                   ) : (
                     <ShieldCheck className="w-4 h-4 text-white flex-shrink-0" />
                   )}
-                  <span className="text-white font-bold text-sm flex-1">
-                    {superTab ? tabMeta[superTab]?.label : 'Super Admin'}
+                  <span className="text-white font-bold text-sm flex-1 text-left">
+                    {superTab && superOpen ? tabMeta[superTab]?.label : 'Super Admin'}
                   </span>
-                  {pendingCount > 0 && !superTab && (
+                  {pendingCount > 0 && (
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EF4444', color: '#fff' }}>
                       {pendingCount}
                     </span>
                   )}
-                </div>
+                  <svg
+                    className="w-4 h-4 text-white opacity-70 flex-shrink-0 transition-transform duration-200"
+                    style={{ transform: superOpen ? 'rotate(180deg)' : 'none' }}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
                 {/* ── Home menu ── */}
-                {!superTab && (
+                {superOpen && !superTab && (
                   <div className="bg-white p-3 space-y-3">
 
                     {/* Quick actions */}
@@ -1203,7 +1215,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Approvals panel ── */}
-                {superTab === 'approvals' && (
+                {superOpen && superTab === 'approvals' && (
                   <div className="bg-white">
                     <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Exec Access Requests</span>
@@ -1281,7 +1293,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Announce panel ── */}
-                {superTab === 'announce' && (
+                {superOpen && superTab === 'announce' && (
                   <div className="bg-white p-4 space-y-3">
                     <p className="text-xs" style={{ color: '#64748B' }}>This message appears as a banner on every corps member's status page.</p>
                     <textarea
@@ -1311,7 +1323,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Activity Log panel ── */}
-                {superTab === 'log' && (
+                {superOpen && superTab === 'log' && (
                   <div className="bg-white">
                     <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Recent Actions</span>
@@ -1338,7 +1350,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Sessions panel ── */}
-                {superTab === 'sessions' && (
+                {superOpen && superTab === 'sessions' && (
                   <div className="bg-white">
                     <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Active Logins</span>
@@ -1361,7 +1373,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Archives panel ── */}
-                {superTab === 'archives' && (
+                {superOpen && superTab === 'archives' && (
                   <div className="bg-white">
                     <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Past Sessions</span>
@@ -1386,7 +1398,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Duplicates panel ── */}
-                {superTab === 'duplicates' && (
+                {superOpen && superTab === 'duplicates' && (
                   <div className="bg-white">
                     <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Duplicate Entries</span>
@@ -1415,7 +1427,7 @@ export default function Dashboard() {
                 )}
 
                 {/* ── Venue panel ── */}
-                {superTab === 'venue' && (
+                {superOpen && superTab === 'venue' && (
                   <div className="bg-white p-4 space-y-3">
                     <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
                       <div>
