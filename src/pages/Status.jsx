@@ -134,30 +134,9 @@ export default function Status() {
     return () => clearInterval(fastPoll)
   }, [reg?.batch_number, reg?.served_at, settings?.current_batch, code])
 
-  // Realtime — settings changes (wave advances, announcement updates) appear immediately
-  useEffect(() => {
-    const ch = supabase
-      .channel('status-settings')
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public',
-        table: 'session_settings', filter: 'id=eq.1',
-      }, payload => {
-        const s = payload.new
-        // Vibrate when this person's wave just got called
-        if (
-          reg &&
-          prevWaveServing.current !== s.current_batch &&
-          s.current_batch === reg?.batch_number &&
-          !reg?.served_at
-        ) {
-          try { if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]) } catch {}
-        }
-        prevWaveServing.current = s.current_batch
-        setSettings(s)
-      })
-      .subscribe()
-    return () => supabase.removeChannel(ch)
-  }, [reg])
+  // No realtime subscription here — 1,000 concurrent users on the free plan (200 connection
+  // limit) would exhaust the quota. The 30s poll + 10s fast-poll when wave is active
+  // already delivers timely updates and handles the vibrate notification.
 
   // ── useMemo MUST be before all early returns (Rules of Hooks) ──
   // servedPerHour only uses servedTimes (always an array), safe to call unconditionally.

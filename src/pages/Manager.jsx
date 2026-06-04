@@ -133,21 +133,21 @@ export default function Manager() {
     async function fetchFeed() {
       const { data } = await supabase
         .from('registrations')
-        .select('id, full_name, state_code, queue_number, batch_number, status, created_at')
+        .select('id, full_name, state_code, queue_number, batch_number, served_at, registered_at')
         .eq('voided', false)
-        .order('created_at', { ascending: false })
+        .order('registered_at', { ascending: false })
         .limit(15)
       if (data) setLiveRegs(data)
 
       // Quick stats
       const { data: all } = await supabase
         .from('registrations')
-        .select('status, batch_number')
+        .select('served_at, batch_number')
         .eq('voided', false)
       if (all) {
         const total   = all.length
-        const served  = all.filter(r => r.status === 'served').length
-        const waiting = all.filter(r => r.status === 'waiting').length
+        const served  = all.filter(r => !!r.served_at).length
+        const waiting = all.filter(r => !r.served_at).length
         setLiveStats({ total, waiting, served })
       }
     }

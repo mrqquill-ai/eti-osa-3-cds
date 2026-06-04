@@ -254,7 +254,7 @@ export default function Join() {
           } else if (msg.includes('registration_closed')) {
             setError('Registration is closed for the day.')
           } else if (msg.includes('device_limit_reached')) {
-            setError('You have already registered on this phone. If you need help, see an executive at the desk.')
+            setError('Too many registrations from this device today. Please use a different phone or see an executive at the desk.')
           } else if (msg.includes('outside_geofence')) {
             setError('You must be at the venue to register. Move closer and try again.')
           } else if (friendlyNetworkError(msg)) {
