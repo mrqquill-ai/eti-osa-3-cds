@@ -10,7 +10,8 @@ export default function Status() {
   const [reg, setReg] = useState(null)
   const [settings, setSettings] = useState(null)
   const [batchMembers, setBatchMembers] = useState([])
-  const [servedTimes, setServedTimes] = useState([])   // for velocity calc
+  const [servedCount, setServedCount] = useState(0)         // for velocity calc
+  const [firstServedAt, setFirstServedAt] = useState(null)  // for velocity calc
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const prevWaveServing = useRef(null)
@@ -21,18 +22,24 @@ export default function Status() {
 
     async function load() {
       setLoading(true)
-      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
+      const [{ data: r }, { data: s }, { data: velFirst, count: velCount }] = await Promise.all([
         supabase
           .from('registrations')
-          .select('*')
+          .select('id, state_code, full_name, queue_number, batch_number, served_at, voided, registered_at')
           .eq('state_code', code)
           .eq('voided', false)
           .maybeSingle(),
         supabase.from('session_settings').select('*').eq('id', 1).single(),
-        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
+        supabase.from('registrations')
+          .select('served_at', { count: 'exact' })
+          .not('served_at', 'is', null)
+          .eq('voided', false)
+          .order('served_at', { ascending: true })
+          .limit(1)
       ])
       if (cancelled) return
-      if (vel) setServedTimes(vel.map(v => v.served_at))
+      if (velCount !== null) setServedCount(velCount)
+      if (velFirst?.[0]?.served_at) setFirstServedAt(velFirst[0].served_at)
       if (!r) {
         setNotFound(true)
       } else {
@@ -60,17 +67,23 @@ export default function Status() {
     if (!code || notFound) return
 
     const poll = async () => {
-      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
+      const [{ data: r }, { data: s }, { data: velFirst, count: velCount }] = await Promise.all([
         supabase
           .from('registrations')
-          .select('*')
+          .select('id, state_code, full_name, queue_number, batch_number, served_at, voided, registered_at')
           .eq('state_code', code)
           .eq('voided', false)
           .maybeSingle(),
         supabase.from('session_settings').select('*').eq('id', 1).single(),
-        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
+        supabase.from('registrations')
+          .select('served_at', { count: 'exact' })
+          .not('served_at', 'is', null)
+          .eq('voided', false)
+          .order('served_at', { ascending: true })
+          .limit(1)
       ])
-      if (vel) setServedTimes(vel.map(v => v.served_at))
+      if (velCount !== null) setServedCount(velCount)
+      if (velFirst?.[0]?.served_at) setFirstServedAt(velFirst[0].served_at)
 
       if (!r) {
         setReg(null)
@@ -107,32 +120,8 @@ export default function Status() {
     return () => clearInterval(interval)
   }, [code, notFound])
 
-  // Separate effect: poll faster (every 10s) when this person's wave is being served
-  useEffect(() => {
-    if (!reg || !settings || reg.served_at) return
-    if (settings.current_batch !== reg.batch_number) return
-    // Wave is active — add a faster poll on top of the 30s one
-    const fastPoll = setInterval(async () => {
-      const [{ data: r }, { data: s }, { data: vel }] = await Promise.all([
-        supabase.from('registrations').select('*').eq('state_code', code).eq('voided', false).maybeSingle(),
-        supabase.from('session_settings').select('*').eq('id', 1).single(),
-        supabase.from('registrations').select('served_at').not('served_at', 'is', null).eq('voided', false)
-      ])
-      if (vel) setServedTimes(vel.map(v => v.served_at))
-      if (r) setReg(r)
-      if (s) setSettings(s)
-      if (r) {
-        const { data: members } = await supabase
-          .from('registrations')
-          .select('id, full_name, state_code, queue_number, batch_number, served_at, voided')
-          .eq('batch_number', r.batch_number)
-          .eq('voided', false)
-          .order('queue_number', { ascending: true })
-        if (members) setBatchMembers(members)
-      }
-    }, 10000)
-    return () => clearInterval(fastPoll)
-  }, [reg?.batch_number, reg?.served_at, settings?.current_batch, code])
+  // Fast poll removed — the 30s interval above is sufficient and avoids
+  // doubling DB load during peak time when waves are being served.
 
   // No realtime subscription here — 1,000 concurrent users on the free plan (200 connection
   // limit) would exhaust the quota. The 30s poll + 10s fast-poll when wave is active
@@ -141,12 +130,10 @@ export default function Status() {
   // ── useMemo MUST be before all early returns (Rules of Hooks) ──
   // servedPerHour only uses servedTimes (always an array), safe to call unconditionally.
   const servedPerHour = useMemo(() => {
-    if (servedTimes.length < 2) return 0
-    const sorted = [...servedTimes].sort((a, b) => new Date(a) - new Date(b))
-    const firstAt = new Date(sorted[0])
-    const hoursElapsed = (Date.now() - firstAt) / (1000 * 60 * 60)
-    return hoursElapsed > 0.02 ? Math.round(servedTimes.length / hoursElapsed) : 0
-  }, [servedTimes])
+    if (servedCount < 2 || !firstServedAt) return 0
+    const hoursElapsed = (Date.now() - new Date(firstServedAt)) / (1000 * 60 * 60)
+    return hoursElapsed > 0.02 ? Math.round(servedCount / hoursElapsed) : 0
+  }, [servedCount, firstServedAt])
 
   if (loading) {
     return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
