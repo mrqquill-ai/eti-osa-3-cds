@@ -53,7 +53,7 @@ function getNextCDSDay() {
 export default function Join() {
   const navigate = useNavigate()
 
-  const [geoState, setGeoState] = useState('checking') // checking | allowed | denied | too_far | error
+  const [geoState, setGeoState] = useState(null) // null=loading | checking | allowed | denied | too_far | error
   const [distance, setDistance] = useState(null)
   const [userCoords, setUserCoords] = useState(null)
   const [fullName, setFullName] = useState('')
@@ -333,6 +333,17 @@ export default function Join() {
           </div>
           {lookupError && <p className="text-red-700 text-xs font-semibold mt-1">{lookupError}</p>}
         </div>
+      </CenteredCard>
+    )
+  }
+
+  if (geoState === null) {
+    return (
+      <CenteredCard>
+        <svg className="w-8 h-8 animate-spin text-emerald-700 mx-auto" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
       </CenteredCard>
     )
   }
