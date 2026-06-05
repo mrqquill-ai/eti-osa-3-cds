@@ -345,16 +345,27 @@ export default function Manager() {
         {/* Quick action */}
         <button
           onClick={async () => {
+            setBusy(true)
+            setError('')
             try {
-              await supabase.from('session_settings').update({ registration_open: true }).eq('id', 1)
+              const { error: e } = await supabase.rpc('admin_toggle_registration', {})
+              if (e) throw e
               setRegistrationOpen(true)
-            } catch {}
+            } catch (e) {
+              setError(e?.message || 'Could not open registration. Try again.')
+            } finally {
+              setBusy(false)
+            }
           }}
-          className="mt-6 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
+          disabled={busy}
+          className="mt-6 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80 disabled:opacity-50"
           style={{ backgroundColor: '#1B6B3A' }}
         >
-          Open registration now
+          {busy ? 'Opening…' : 'Open registration now'}
         </button>
+        {error && (
+          <p className="mt-3 text-sm font-semibold" style={{ color: '#C0392B' }}>{error}</p>
+        )}
       </div>
     )
   }
@@ -753,7 +764,7 @@ export default function Manager() {
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <StatusBadge status={r.status} />
+                        <StatusBadge status={r.served_at ? 'served' : 'waiting'} />
                         <span className="text-[10px]" style={{ color: MUTED }}>W{r.batch_number}</span>
                       </div>
                     </div>
