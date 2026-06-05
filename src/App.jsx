@@ -117,13 +117,14 @@ export default function App() {
           {/* ── DESKTOP SIDEBAR (lg+) ── */}
           <aside
             className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 flex-col z-50 transition-all duration-200"
-            style={{ backgroundColor: G, borderRight: '1px solid rgba(0,0,0,0.12)', width: sidebarOpen ? '240px' : '64px' }}
+            style={{ backgroundColor: G, borderRight: '1px solid rgba(0,0,0,0.12)', width: sidebarOpen ? '240px' : '64px', cursor: sidebarOpen ? 'default' : 'pointer' }}
+            onClick={() => { if (!sidebarOpen) setSidebarOpen(true) }}
           >
             {/* Logo row */}
             <div className="flex items-center px-3.5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', minHeight: '64px' }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-                <ShieldMark className="w-4.5 h-4.5 text-white" />
+                <ShieldMark className="w-[18px] h-[18px] text-white" />
               </div>
               {sidebarOpen && (
                 <>
@@ -157,7 +158,8 @@ export default function App() {
             )}
 
             {/* Nav — full labels when open, icon-only when closed */}
-            <nav className={`flex-1 overflow-y-auto py-3 space-y-0.5 ${sidebarOpen ? 'px-3' : 'px-2'}`}>
+            <nav className={`flex-1 overflow-y-auto py-3 space-y-0.5 ${sidebarOpen ? 'px-3' : 'px-2'}`}
+              onClick={e => e.stopPropagation()}>
               {TABS.map(({ to, icon: Icon, label }) => (
                 <NavLink
                   key={to}
@@ -225,12 +227,16 @@ export default function App() {
                     </button>
                   </>
                 ) : (
-                  <div className="flex justify-center pt-2">
+                  <button
+                    onClick={e => { e.stopPropagation(); setShowSignOutDlg(true) }}
+                    className="flex justify-center w-full pt-2 pb-1 transition-opacity hover:opacity-80"
+                    title="Sign out"
+                  >
                     <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
                       style={{ backgroundColor: GOLD, color: '#1A1A1A' }}>
                       {initials(user)}
                     </div>
-                  </div>
+                  </button>
                 )}
               </div>
             )}
@@ -407,18 +413,18 @@ export default function App() {
             </p>
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => setShowSignOutDlg(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors"
-                style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
-              >
-                Stay signed in
-              </button>
-              <button
                 onClick={signOut}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
-                style={{ backgroundColor: '#C0392B' }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80"
+                style={{ border: '1.5px solid #E2E8F0', color: '#C0392B', backgroundColor: 'rgba(192,57,43,0.04)' }}
               >
                 Sign out
+              </button>
+              <button
+                onClick={() => setShowSignOutDlg(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
+                style={{ backgroundColor: G }}
+              >
+                Stay signed in
               </button>
             </div>
           </div>
