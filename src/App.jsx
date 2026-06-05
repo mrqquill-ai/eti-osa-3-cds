@@ -52,7 +52,9 @@ export default function App() {
   const [user,           setUser]           = useState(null)
   const [sessionOpen,    setSessionOpen]    = useState(false)
   const [showSheet,      setShowSheet]      = useState(false)
-  const [sidebarOpen,    setSidebarOpen]    = useState(true)
+  const [sidebarOpen,    setSidebarOpen]    = useState(() => {
+    try { return localStorage.getItem('cds_sidebar') !== 'closed' } catch { return true }
+  })
   const [showSignOutDlg, setShowSignOutDlg] = useState(false)
 
   useEffect(() => {
@@ -84,6 +86,10 @@ export default function App() {
       .subscribe()
     return () => supabase.removeChannel(ch)
   }, [isExecPage])
+
+  useEffect(() => {
+    try { localStorage.setItem('cds_sidebar', sidebarOpen ? 'open' : 'closed') } catch {}
+  }, [sidebarOpen])
 
   async function signOut() {
     setShowSheet(false)
