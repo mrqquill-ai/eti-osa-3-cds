@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, ScanLine, BarChart2, Megaphone, Settings } from 'lucide-react'
+import { LayoutGrid, ScanLine, BarChart2, Megaphone, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from './lib/supabase.js'
 import { useOnlineStatus } from './lib/useOnlineStatus.js'
 
@@ -52,6 +52,7 @@ export default function App() {
   const [user,        setUser]        = useState(null)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [showSheet,   setShowSheet]   = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -113,71 +114,109 @@ export default function App() {
         <>
           {/* ── DESKTOP SIDEBAR (lg+) ── */}
           <aside
-            className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:w-60 flex-col z-50"
-            style={{ backgroundColor: G, borderRight: '1px solid rgba(0,0,0,0.12)' }}
+            className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 flex-col z-50 transition-all duration-200"
+            style={{
+              backgroundColor: G,
+              borderRight: '1px solid rgba(0,0,0,0.12)',
+              width: sidebarOpen ? '240px' : '64px',
+              cursor: sidebarOpen ? 'default' : 'pointer',
+            }}
+            onClick={() => !sidebarOpen && setSidebarOpen(true)}
           >
-            {/* Logo */}
-            <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            {/* Logo row */}
+            <div
+              className="flex items-center px-4 py-5 relative group overflow-hidden"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', minHeight: '72px' }}
+            >
+              {/* Shield icon — always visible */}
               <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 relative"
                 style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
               >
                 <ShieldMark className="w-4.5 h-4.5 text-white" />
+                {/* Expand arrow overlay on hover when closed */}
+                {!sidebarOpen && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}>
+                    <ChevronRight className="w-4 h-4 text-white" />
+                  </div>
+                )}
               </div>
-              <div>
-                <div className="font-bold text-white text-sm leading-tight">CDS Manager</div>
-                <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                  Eti-Osa 3 Special CDS
+
+              {/* App name + collapse button — only when open */}
+              {sidebarOpen && (
+                <>
+                  <div className="flex-1 min-w-0 ml-3">
+                    <div className="font-bold text-white text-sm leading-tight">CDS Manager</div>
+                    <div className="text-[10px] leading-tight" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      Eti-Osa 3 Special CDS
+                    </div>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setSidebarOpen(false) }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg flex-shrink-0 opacity-40 hover:opacity-100 transition-opacity"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    title="Collapse sidebar"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-white" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Session status — only when open */}
+            {sidebarOpen && (
+              <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: sessionOpen ? '#4ade80' : 'rgba(255,255,255,0.3)' }}
+                  />
+                  <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                    {sessionOpen ? 'Registration open' : 'Registration closed'}
+                  </span>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Session status */}
-            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: sessionOpen ? '#4ade80' : 'rgba(255,255,255,0.3)' }}
-                />
-                <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  {sessionOpen ? 'Registration open' : 'Registration closed'}
-                </span>
-              </div>
-            </div>
-
-            {/* Nav items */}
-            <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {TABS.map(({ to, icon: Icon, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 group"
-                  style={({ isActive }) => ({
-                    backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
-                    color: isActive ? 'white' : 'rgba(255,255,255,0.6)',
-                  })}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        className="w-4.5 h-4.5 flex-shrink-0 transition-colors"
-                        style={{ color: isActive ? 'white' : 'rgba(255,255,255,0.5)' }}
-                      />
-                      <span>{label}</span>
-                      {isActive && (
-                        <span
-                          className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: '#4ade80' }}
+            {/* Nav items — only when open */}
+            {sidebarOpen && (
+              <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+                {TABS.map(({ to, icon: Icon, label }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150"
+                    style={({ isActive }) => ({
+                      backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                      color: isActive ? 'white' : 'rgba(255,255,255,0.6)',
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon
+                          className="w-4.5 h-4.5 flex-shrink-0"
+                          style={{ color: isActive ? 'white' : 'rgba(255,255,255,0.5)' }}
                         />
-                      )}
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </nav>
+                        <span>{label}</span>
+                        {isActive && (
+                          <span
+                            className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: '#4ade80' }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </nav>
+            )}
 
-            {/* User info */}
-            {user && (
+            {/* Spacer when closed so user button sits at bottom */}
+            {!sidebarOpen && <div className="flex-1" />}
+
+            {/* User info — only when open */}
+            {user && sidebarOpen && (
               <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="flex items-center gap-3">
                   <div
@@ -198,10 +237,7 @@ export default function App() {
                 <button
                   onClick={signOut}
                   className="mt-3 w-full text-xs font-semibold py-2 rounded-lg transition-colors"
-                  style={{
-                    color: 'rgba(255,255,255,0.55)',
-                    backgroundColor: 'rgba(255,255,255,0.07)',
-                  }}
+                  style={{ color: 'rgba(255,255,255,0.55)', backgroundColor: 'rgba(255,255,255,0.07)' }}
                 >
                   Sign out
                 </button>
@@ -278,12 +314,9 @@ export default function App() {
       )}
 
       {/* ── Page content ── */}
-      <main className={`
-        flex-1
-        ${isExecPage
-          ? 'pt-[96px] pb-[72px] lg:pt-0 lg:pb-0 lg:pl-60'
-          : ''}
-      `}>
+      <main
+        className={`flex-1 transition-all duration-200 ${isExecPage ? `pt-[96px] pb-[72px] lg:pt-0 lg:pb-0 ${sidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-[64px]'}` : ''}`}
+      >
         <Outlet />
       </main>
 
