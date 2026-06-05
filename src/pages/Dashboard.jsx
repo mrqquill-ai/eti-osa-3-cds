@@ -897,7 +897,7 @@ export default function Dashboard() {
       {/* ── Personalised greeting ── */}
       {userName && (
         <div className="mb-4 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3"
-          style={{ background: 'linear-gradient(135deg, #1B6B3A 0%, #14532D 100%)' }}>
+          style={{ backgroundColor: '#1B6B3A' }}>
           <div>
             <div className="text-white font-extrabold text-base leading-tight">
               {(() => {

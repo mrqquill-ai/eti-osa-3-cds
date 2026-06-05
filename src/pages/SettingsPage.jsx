@@ -324,7 +324,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <button
-                onClick={isOpen ? () => setSheet('closeSession') : toggleRegistration}
+                onClick={isOpen ? () => setSheet('closeSession') : () => setSheet('openSession')}
                 disabled={busy || !settings}
                 className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 style={{
@@ -455,6 +455,20 @@ export default function SettingsPage() {
           body="No new check-ins will be accepted. You can reopen at any time."
           confirmLabel="Close Session"
           destructive
+          onCancel={closeSheet}
+          onConfirm={toggleRegistration}
+          busy={busy}
+        >
+          {error && <p className="text-xs font-semibold mb-2" style={{ color: DESTRUCTIVE }}>{error}</p>}
+        </ConfirmSheet>
+      )}
+
+      {sheet === 'openSession' && (
+        <ConfirmSheet
+          title="Open registration?"
+          body="Corps members will be able to join the queue immediately. Make sure your execs are ready at the venue."
+          confirmLabel="Open Registration"
+          destructive={false}
           onCancel={closeSheet}
           onConfirm={toggleRegistration}
           busy={busy}
