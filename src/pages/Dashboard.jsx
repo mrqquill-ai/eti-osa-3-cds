@@ -46,9 +46,10 @@ export default function Dashboard() {
   const [showAddRegModal, setShowAddRegModal] = useState(false)
   const [addRegName, setAddRegName] = useState('')
   const [addRegCode, setAddRegCode] = useState('')
-  const [showEditModal, setShowEditModal] = useState(null)
-  const [editName, setEditName] = useState('')
-  const [editCode, setEditCode] = useState('')
+  const [showEditModal,    setShowEditModal]    = useState(null)
+  const [editName,         setEditName]         = useState('')
+  const [editCode,         setEditCode]         = useState('')
+  const [editQueueNumber,  setEditQueueNumber]  = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
           
   // Super admin panel
@@ -509,20 +510,43 @@ export default function Dashboard() {
     if (!showEditModal) return
     const name = editName.trim()
     const code = editCode.trim().toUpperCase().replace(/\s+/g, '')
+    const newQ  = parseInt(editQueueNumber, 10)
     if (!name || name.length < 2) { setError('Name must be at least 2 characters.'); return }
     if (!code) { setError('Enter a state code.'); return }
+    if (!newQ || newQ < 1) { setError('Queue number must be a positive number.'); return }
     setBusy(true); setError('')
     try {
-      const { error: e } = await supabase.rpc('super_admin_edit_registration', {
+      // Update name + state code
+      const { error: e1 } = await supabase.rpc('super_admin_edit_registration', {
         p_registration_id: showEditModal.id, p_full_name: name, p_state_code: code
       })
-      if (e) throw e
+      if (e1) throw e1
+
+      // Update queue number if changed
+      if (newQ !== showEditModal.queue_number) {
+        const { error: e2 } = await supabase.rpc('super_admin_set_queue_number', {
+          p_registration_id: showEditModal.id, p_queue_number: newQ
+        })
+        if (e2) throw e2
+      }
+
       flash(`Updated ${name}.`)
       setShowEditModal(null)
     } catch (e) {
       const msg = e?.message || ''
       if (msg.includes('duplicate_state_code')) setError('That state code is already in use.')
-      else showError(e)
+      else setError(msg || 'Could not save changes.')
+    } finally { setBusy(false) }
+  }
+
+  async function superRenumberQueue() {
+    setBusy(true); setError('')
+    try {
+      const { data, error: e } = await supabase.rpc('super_admin_renumber_queue')
+      if (e) throw e
+      flash(`Queue renumbered — ${data} entries updated from #1.`)
+    } catch (e) {
+      setError(e?.message || 'Could not renumber queue.')
     } finally { setBusy(false) }
   }
 
@@ -1163,7 +1187,7 @@ export default function Dashboard() {
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#94A3B8' }}>Quick Actions</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {(['announce', 'venue'] ).map(key => (
+                        {(['announce', 'venue']).map(key => (
                           <button key={key} onClick={() => setSuperTab(key)}
                             className="flex flex-col items-start gap-1 p-3 rounded-xl text-left transition-colors active:opacity-70"
                             style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
@@ -1174,6 +1198,20 @@ export default function Dashboard() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Renumber queue — critical fix tool */}
+                    <button
+                      onClick={superRenumberQueue}
+                      disabled={busy}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors active:opacity-70 disabled:opacity-40"
+                      style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.3)' }}
+                    >
+                      <span className="text-lg">🔢</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold" style={{ color: '#92400E' }}>Renumber Queue</div>
+                        <div className="text-[11px]" style={{ color: '#B45309' }}>Close gaps — reassigns #1, #2, #3… in order</div>
+                      </div>
+                    </button>
 
                     {/* Management list */}
                     <div>
@@ -1683,7 +1721,7 @@ export default function Dashboard() {
                           {isSuperAdmin && (
                             <div className="w-16 flex justify-center gap-1">
                               <button
-                                onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
+                                onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setEditQueueNumber(String(r.queue_number)); setError('') }}
                                 disabled={rowBusy === r.id}
                                 className="p-1.5 rounded-lg transition-opacity disabled:opacity-40"
                                 style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
@@ -1768,7 +1806,7 @@ export default function Dashboard() {
                           {isSuperAdmin && (
                             <>
                               <button
-                                onClick={e => { e.stopPropagation(); setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setError('') }}
+                                onClick={e => { e.stopPropagation(); setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setEditQueueNumber(String(r.queue_number)); setError('') }}
                                 disabled={rowBusy === r.id}
                                 className="px-3 py-2 rounded-lg transition-opacity disabled:opacity-40"
                                 style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
@@ -2092,7 +2130,7 @@ export default function Dashboard() {
             <Pencil className="w-5 h-5 text-purple-700" />
             <h2 className="text-lg font-extrabold text-slate-950">Edit registration</h2>
           </div>
-          <p className="text-slate-600 text-sm">Q#{showEditModal.queue_number} {'\u00B7'} Wave {showEditModal.batch_number}</p>
+          <p className="text-slate-600 text-sm">Wave {showEditModal.batch_number}</p>
           <div className="mt-4 space-y-3">
             <label className="block">
               <span className="text-sm font-bold text-slate-900">Full name</span>
@@ -2113,6 +2151,17 @@ export default function Dashboard() {
                 onChange={(e) => setEditCode(e.target.value.toUpperCase())}
                 maxLength={20}
                 className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 font-mono tracking-wider text-slate-950"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-bold text-slate-900">Queue number</span>
+              <p className="text-xs text-slate-500 mt-0.5 mb-1">If this slot is taken, the two people swap numbers automatically.</p>
+              <input
+                type="number"
+                min={1}
+                value={editQueueNumber}
+                onChange={(e) => setEditQueueNumber(e.target.value)}
+                className="mt-1 w-full rounded-lg border-2 border-slate-300 focus:border-purple-600 focus:outline-none px-3 py-2.5 text-slate-950 font-mono"
               />
             </label>
           </div>
