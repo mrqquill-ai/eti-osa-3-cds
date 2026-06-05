@@ -922,19 +922,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Heading ── */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold" style={{ color: '#0F172A' }}>Dashboard</h1>
-          {isSuperAdmin && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
-              <ShieldCheck className="w-3 h-3" /> Super Admin
-            </span>
-          )}
-        </div>
-        <p className="text-xs font-medium" style={{ color: '#64748B' }}>Eti-Osa 3 Special CDS</p>
-      </div>
-
       {/* ── Status chips ── */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-4 pb-0.5">
         <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}>
