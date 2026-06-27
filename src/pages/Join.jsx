@@ -264,6 +264,8 @@ export default function Join() {
             setError('Too many registrations from this device today. Please use a different phone or see an executive at the desk.')
           } else if (msg.includes('outside_geofence')) {
             setError('You must be at the venue to register. Move closer and try again.')
+          } else if (msg.includes('location_required')) {
+            setError('Location is required to register. Turn on location access and try again.')
           } else if (friendlyNetworkError(msg)) {
             if (retryCount.current < 3) {
               retryCount.current += 1
