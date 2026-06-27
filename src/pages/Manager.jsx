@@ -618,10 +618,9 @@ export default function Manager() {
             )}
           </div>
 
-          {/* Check-in Link Card — super admin only (prevents execs sharing the link) */}
-          {isSuperAdmin && (
+          {/* Check-in QR Card — QR is for all execs; sharable link/buttons are super admin only */}
           <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
-            <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in Link</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in QR</h2>
             <p className="text-xs mb-4" style={{ color: MUTED }}>
               Show the QR code for corps members to scan and join the queue from their own phones.
             </p>
@@ -665,6 +664,9 @@ export default function Manager() {
               </button>
             </div>
 
+            {/* URL row + share buttons — super admin only (prevents execs sharing the link) */}
+            {isSuperAdmin && (
+            <>
             {/* URL row */}
             <div className="flex items-center gap-2 p-3 rounded-xl mt-4" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
               <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: MUTED }} />
@@ -705,8 +707,9 @@ export default function Manager() {
                 Share
               </button>
             </div>
+            </>
+            )}
           </div>
-          )}
 
           {/* Recent (mobile only – desktop has live feed on right) */}
           {recentRegs.length > 0 && (

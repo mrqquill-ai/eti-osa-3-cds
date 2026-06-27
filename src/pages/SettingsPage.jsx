@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Lock, Unlock, Download, PlayCircle, RotateCcw,
-  Link2, Copy, MapPin, ChevronRight, AlertTriangle, X, Share2
+  Link2, Copy, MapPin, ChevronRight, AlertTriangle, X, Share2,
+  FileSpreadsheet, FileText
 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { supabase } from '../lib/supabase.js'
+import { generateExcelReport, generatePdfReport } from '../lib/reports.js'
 
 const G           = '#1B6B3A'
 const MUTED       = '#64748B'
@@ -138,6 +140,15 @@ export default function SettingsPage() {
   const [venueRadius, setVenueRadius] = useState('')
   const [geoEnabled,  setGeoEnabled]  = useState(true)
 
+  /* Reports */
+  const [reportDates,   setReportDates]   = useState([])
+  const [reportSession, setReportSession] = useState('current')
+  const [reportBusy,    setReportBusy]    = useState(null)
+
+  useEffect(() => {
+    supabase.rpc('report_session_dates').then(({ data }) => { if (data) setReportDates(data) })
+  }, [])
+
   useEffect(() => {
     async function load() {
       const { data: s } = await supabase.from('session_settings').select('*').eq('id', 1).single()
@@ -252,31 +263,40 @@ export default function SettingsPage() {
     } catch (e) { setError(e.message || 'Could not save location.') } finally { setBusy(false) }
   }
 
-  async function exportCSV() {
-    setBusy(true)
+  async function fetchReportRows() {
+    if (reportSession === 'current') {
+      const { data } = await supabase
+        .from('registrations')
+        .select('full_name, state_code, registered_at, queue_number, served_at, voided')
+        .eq('voided', false)
+        .order('queue_number', { ascending: true })
+      return data || []
+    }
+    const { data, error } = await supabase.rpc('report_session_data', { p_date: reportSession })
+    if (error) throw error
+    return (data || []).filter(r => !r.voided)
+  }
+
+  function reportLabel() {
+    if (reportSession === 'current') return 'Session: Current (today)'
+    const d = new Date(reportSession)
+    return 'Session: ' + d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  async function handleReport(kind) {
+    setReportBusy(kind)
+    setError('')
     try {
-      const { data } = await supabase.from('registrations').select('*').order('queue_number', { ascending: true }).limit(2000)
-      if (!data) return
-      const headers = ['Queue #', 'Full Name', 'State Code', 'Wave', 'Registered At', 'Served At', 'Voided']
-      const csvRows = [headers.join(',')]
-      for (const r of data) {
-        csvRows.push([
-          r.queue_number,
-          `"${r.full_name.replace(/"/g, '""')}"`,
-          r.state_code, r.batch_number,
-          new Date(r.registered_at).toLocaleString('en-NG'),
-          r.served_at ? new Date(r.served_at).toLocaleString('en-NG') : '',
-          r.voided ? 'Yes' : ''
-        ].join(','))
-      }
-      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `clearance-${new Date().toISOString().slice(0, 10)}.csv`
-      a.click()
-      URL.revokeObjectURL(a.href)
-      flash('CSV downloaded.')
-    } catch {} finally { setBusy(false) }
+      const rows = await fetchReportRows()
+      if (rows.length === 0) { setError('No registrations found for this session.'); return }
+      const payload = { rows, sessionLabel: reportLabel() }
+      if (kind === 'excel') await generateExcelReport(payload)
+      else await generatePdfReport(payload)
+    } catch (e) {
+      setError(e?.message || 'Could not generate the report. Try again.')
+    } finally {
+      setReportBusy(null)
+    }
   }
 
   const isOpen = settings?.registration_open
@@ -416,9 +436,9 @@ export default function SettingsPage() {
             <CardHeader label="Data" />
             <SettingsRow
               icon={Download}
-              title="Export CSV"
-              subtitle="Download today's full registration list"
-              onClick={exportCSV}
+              title="Attendance Report"
+              subtitle="Download a formal record as Excel or PDF"
+              onClick={() => { setReportSession('current'); setError(''); setSheet('report') }}
               disabled={busy}
             />
             <Divider />
@@ -461,6 +481,62 @@ export default function SettingsPage() {
         >
           {error && <p className="text-xs font-semibold mb-2" style={{ color: DESTRUCTIVE }}>{error}</p>}
         </ConfirmSheet>
+      )}
+
+      {sheet === 'report' && (
+        <div className="fixed inset-0 z-[100] lg:flex lg:items-center lg:justify-center lg:p-6">
+          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={closeSheet} />
+          <div
+            className="bg-white px-6 pt-5 absolute bottom-0 left-0 right-0 rounded-t-2xl lg:relative lg:z-10 lg:bottom-auto lg:rounded-2xl lg:max-w-md lg:w-full lg:shadow-2xl lg:pt-7 lg:pb-7"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+          >
+            <div className="lg:hidden w-10 h-1 rounded-full bg-slate-200 mx-auto mb-5" />
+            <h3 className="text-base font-bold mb-1" style={{ color: INK }}>Attendance Report</h3>
+            <p className="text-sm mb-4" style={{ color: MUTED }}>Download a formal attendance record as Excel or PDF.</p>
+
+            <label className="block text-xs font-semibold mb-1" style={{ color: INK }}>Session</label>
+            <select
+              value={reportSession}
+              onChange={e => { setReportSession(e.target.value); setError('') }}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none mb-4 bg-white"
+              style={{ border: `1.5px solid ${LINE}`, color: INK }}
+            >
+              <option value="current">Current session (today)</option>
+              {reportDates.map(d => (
+                <option key={d.session_date} value={d.session_date}>
+                  {new Date(d.session_date).toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} ({d.entry_count})
+                </option>
+              ))}
+            </select>
+
+            {error && <p className="text-xs font-semibold mb-3" style={{ color: DESTRUCTIVE }}>{error}</p>}
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handleReport('excel')}
+                disabled={!!reportBusy}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: G }}
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                {reportBusy === 'excel' ? 'Preparing…' : 'Excel'}
+              </button>
+              <button
+                onClick={() => handleReport('pdf')}
+                disabled={!!reportBusy}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-opacity active:opacity-80 disabled:opacity-50"
+                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1.5px solid rgba(27,107,58,0.2)` }}
+              >
+                <FileText className="w-4 h-4" />
+                {reportBusy === 'pdf' ? 'Preparing…' : 'PDF'}
+              </button>
+            </div>
+
+            <button onClick={closeSheet} className="w-full mt-3 py-3 rounded-xl text-sm font-semibold border" style={{ borderColor: LINE, color: INK }}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {sheet === 'openSession' && (

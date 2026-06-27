@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap, Clock, TrendingUp, Users, FileSpreadsheet, FileText } from 'lucide-react'
+import { Zap, Clock, TrendingUp, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
-import { generateExcelReport, generatePdfReport } from '../lib/reports.js'
 
 const G     = '#1B6B3A'
 const MUTED = '#64748B'
@@ -44,57 +43,6 @@ export default function StatsPage() {
   const [registrations, setRegistrations] = useState([])
   const [settings,      setSettings]      = useState(null)
   const [loading,       setLoading]       = useState(true)
-
-  /* ── Reports ── */
-  const [reportDates,   setReportDates]   = useState([])
-  const [reportSession, setReportSession] = useState('current')
-  const [reportBusy,    setReportBusy]    = useState(null) // 'excel' | 'pdf' | null
-  const [reportError,   setReportError]   = useState('')
-
-  useEffect(() => {
-    supabase.rpc('report_session_dates').then(({ data }) => {
-      if (data) setReportDates(data)
-    })
-  }, [])
-
-  async function fetchReportRows() {
-    if (reportSession === 'current') {
-      const { data } = await supabase
-        .from('registrations')
-        .select('full_name, state_code, registered_at, queue_number, served_at, voided')
-        .eq('voided', false)
-        .order('queue_number', { ascending: true })
-      return data || []
-    }
-    const { data, error } = await supabase.rpc('report_session_data', { p_date: reportSession })
-    if (error) throw error
-    return (data || []).filter(r => !r.voided)
-  }
-
-  function reportLabel() {
-    if (reportSession === 'current') return 'Session: Current (today)'
-    const d = new Date(reportSession)
-    return 'Session: ' + d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  }
-
-  async function handleReport(kind) {
-    setReportBusy(kind)
-    setReportError('')
-    try {
-      const rows = await fetchReportRows()
-      if (rows.length === 0) {
-        setReportError('No registrations found for this session.')
-        return
-      }
-      const payload = { rows, sessionLabel: reportLabel() }
-      if (kind === 'excel') await generateExcelReport(payload)
-      else await generatePdfReport(payload)
-    } catch (e) {
-      setReportError(e?.message || 'Could not generate the report. Try again.')
-    } finally {
-      setReportBusy(null)
-    }
-  }
 
   useEffect(() => {
     async function load() {
@@ -403,51 +351,6 @@ export default function StatsPage() {
         </div>
       )}
 
-      {/* ══ Reports ══ */}
-      <div className="bg-white rounded-2xl p-5 mt-5" style={{ border: `1px solid ${LINE}` }}>
-        <p className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: MUTED }}>Attendance Reports</p>
-        <p className="text-sm mb-4" style={{ color: MUTED }}>Download a formal attendance record as Excel or PDF.</p>
-
-        <label className="block text-xs font-semibold mb-1" style={{ color: INK }}>Session</label>
-        <select
-          value={reportSession}
-          onChange={e => { setReportSession(e.target.value); setReportError('') }}
-          className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none mb-4 bg-white"
-          style={{ border: `1.5px solid ${LINE}`, color: INK }}
-        >
-          <option value="current">Current session (today)</option>
-          {reportDates.map(d => (
-            <option key={d.session_date} value={d.session_date}>
-              {new Date(d.session_date).toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} ({d.entry_count})
-            </option>
-          ))}
-        </select>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => handleReport('excel')}
-            disabled={!!reportBusy}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80 disabled:opacity-50"
-            style={{ backgroundColor: G }}
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            {reportBusy === 'excel' ? 'Preparing…' : 'Excel'}
-          </button>
-          <button
-            onClick={() => handleReport('pdf')}
-            disabled={!!reportBusy}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-opacity active:opacity-80 disabled:opacity-50"
-            style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1.5px solid rgba(27,107,58,0.2)` }}
-          >
-            <FileText className="w-4 h-4" />
-            {reportBusy === 'pdf' ? 'Preparing…' : 'PDF'}
-          </button>
-        </div>
-
-        {reportError && (
-          <p className="text-xs font-semibold mt-3" style={{ color: RED }}>{reportError}</p>
-        )}
-      </div>
     </div>
   )
 }
