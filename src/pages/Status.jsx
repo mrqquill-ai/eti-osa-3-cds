@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 // lucide icons removed — using emoji for status states
 import { supabase } from '../lib/supabase.js'
 
@@ -274,6 +275,25 @@ export default function Status() {
 
         <div className="mt-5">{statusBlock}</div>
       </div>
+
+      {/* Member pass: exec scans this to pull up and serve you */}
+      {!isCleared && (
+        <div className="bg-white rounded-2xl shadow border border-slate-200 mt-4 p-5 flex flex-col items-center">
+          <div className="text-xs uppercase tracking-wider font-bold mb-3" style={{ color: '#64748B' }}>Your check-in pass</div>
+          <div className="p-3 bg-white rounded-xl border-2 border-slate-200">
+            <QRCodeSVG
+              value={`CDSMEMBER:${reg.id}`}
+              size={170}
+              bgColor="#ffffff"
+              fgColor="#1B6B3A"
+              level="M"
+            />
+          </div>
+          <div className="mt-3 text-center text-xs leading-relaxed max-w-[230px]" style={{ color: '#64748B' }}>
+            Show this to an executive at the desk. They scan it to confirm and clear you.
+          </div>
+        </div>
+      )}
 
       {/* Batch queue list */}
       {batchMembers.length > 0 && (

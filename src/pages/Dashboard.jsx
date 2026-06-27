@@ -17,7 +17,8 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Unlock
+  Unlock,
+  ScanLine
 } from 'lucide-react'
 import jsQR from 'jsqr'
 import { supabase } from '../lib/supabase.js'
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const [soundEnabled, setSoundEnabled] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [qrScanning, setQrScanning] = useState(false)
+  const [scannedMember, setScannedMember] = useState(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const scanIntervalRef = useRef(null)
@@ -761,7 +763,14 @@ export default function Dashboard() {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
             const code = jsQR(imageData.data, imageData.width, imageData.height)
             if (code && code.data) {
-              // Extract state code from URL: /status/XX/00X/0000
+              // Member check-in pass: CDSMEMBER:<uuid>
+              if (code.data.startsWith('CDSMEMBER:')) {
+                const memberId = code.data.slice('CDSMEMBER:'.length).trim()
+                stopQRScan()
+                lookupScannedMember(memberId)
+                return
+              }
+              // Fallback: state code from a /status/XX/00X/0000 URL
               const match = code.data.match(/\/status\/([A-Z]{2}%2F\d{2}[A-Z]%2F\d+|[A-Z]{2}\/\d{2}[A-Z]\/\d+)/)
               if (match) {
                 const stateCode = decodeURIComponent(match[1])
@@ -787,6 +796,20 @@ export default function Dashboard() {
     }
     setShowQRScanner(false)
     setQrScanning(false)
+  }
+
+  async function lookupScannedMember(memberId) {
+    try {
+      const { data } = await supabase
+        .from('registrations')
+        .select('id, full_name, state_code, queue_number, batch_number, served_at, voided, registered_at')
+        .eq('id', memberId)
+        .maybeSingle()
+      if (data) setScannedMember(data)
+      else flash('No matching registration found.')
+    } catch {
+      flash('Could not look up that pass. Try again.')
+    }
   }
 
   // Sound alert: play when registration count crosses thresholds
@@ -1555,19 +1578,29 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Search — mobile only (desktop search is in the action bar above) */}
-          <div className="lg:hidden relative mb-3">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
-              placeholder={dashTab === 'served' ? 'Verify a name or state code…' : 'Search by name or state code…'}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
-              style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
-              onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
-              onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none' }}
-            />
+          {/* Search + scan — mobile only (desktop search is in the action bar above) */}
+          <div className="lg:hidden flex gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
+                placeholder={dashTab === 'served' ? 'Verify a name or state code…' : 'Search by name or state code…'}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
+                style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
+                onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
+                onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none' }}
+              />
+            </div>
+            <button
+              onClick={startQRScan}
+              title="Scan member pass"
+              className="flex-shrink-0 px-3.5 rounded-xl flex items-center justify-center active:opacity-70"
+              style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A', border: '1.5px solid rgba(27,107,58,0.2)' }}
+            >
+              <ScanLine className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Members count — mobile only */}
@@ -2241,6 +2274,50 @@ export default function Dashboard() {
             <div className="absolute inset-0 border-4 border-white/30 rounded-lg pointer-events-none" />
           </div>
           <button onClick={stopQRScan} className="w-full mt-3 px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors">Close scanner</button>
+        </Modal>
+      )}
+
+      {scannedMember && (
+        <Modal onClose={() => setScannedMember(null)}>
+          <div className="text-center">
+            <div className="text-xs uppercase tracking-wider font-bold" style={{ color: '#1B6B3A' }}>Check-in pass</div>
+            <div className="mt-1 text-xl font-extrabold text-slate-950 break-words">{scannedMember.full_name}</div>
+            <div className="text-sm font-mono text-slate-600">{scannedMember.state_code}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'rgba(27,107,58,0.06)' }}>
+              <div className="text-[10px] uppercase font-bold" style={{ color: '#1B6B3A' }}>Queue #</div>
+              <div className="text-2xl font-extrabold" style={{ color: '#0F172A' }}>{scannedMember.queue_number}</div>
+            </div>
+            <div className="rounded-xl p-3 text-center bg-slate-100">
+              <div className="text-[10px] uppercase font-bold text-slate-600">Wave</div>
+              <div className="text-2xl font-extrabold text-slate-900">{scannedMember.batch_number}</div>
+            </div>
+          </div>
+
+          <div className="mt-3 text-center text-sm font-semibold"
+            style={{ color: scannedMember.voided ? '#C0392B' : scannedMember.served_at ? '#1B6B3A' : '#D97706' }}>
+            {scannedMember.voided ? 'This entry was voided' : scannedMember.served_at ? 'Already served' : 'Waiting to be served'}
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => setScannedMember(null)}
+              className="flex-1 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 font-semibold text-slate-900 transition-colors"
+            >
+              Close
+            </button>
+            {!scannedMember.voided && (
+              <button
+                onClick={async () => { await toggleServed(scannedMember); setScannedMember(null) }}
+                className="flex-1 py-2.5 rounded-xl font-bold text-white transition-opacity active:opacity-80"
+                style={{ backgroundColor: scannedMember.served_at ? '#F59B0A' : '#1B6B3A' }}
+              >
+                {scannedMember.served_at ? 'Undo served' : 'Mark served'}
+              </button>
+            )}
+          </div>
         </Modal>
       )}
 
