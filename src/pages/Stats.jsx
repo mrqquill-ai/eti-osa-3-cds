@@ -235,10 +235,16 @@ export default function StatsPage() {
               {/* Wave timeline */}
               {waveKeys.length > 0 && (
                 <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
-                  <p className="text-[11px] font-bold uppercase tracking-wider mb-4" style={{ color: MUTED }}>
-                    Wave Timeline
-                  </p>
-                  <div className="flex gap-1.5">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>
+                      Wave Timeline
+                    </p>
+                    <p className="text-[11px] font-semibold" style={{ color: MUTED }}>
+                      {waveKeys.length} wave{waveKeys.length !== 1 ? 's' : ''}
+                      {waveKeys.length > 6 ? ' · scroll →' : ''}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
                     {waveKeys.map(wave => {
                       const { total: wTotal, served: wServed } = waves[wave]
                       const isDone = wServed === wTotal && wTotal > 0
@@ -248,30 +254,30 @@ export default function StatsPage() {
                       const labelColor = isDone ? AMBER : isNow ? G : MUTED
 
                       return (
-                        <div key={wave} className="flex-1 min-w-0">
+                        <div key={wave} className="flex-shrink-0" style={{ width: '46px' }}>
                           {/* Progress bar block */}
-                          <div className="relative h-9 rounded-xl overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
+                          <div className="relative h-12 rounded-xl overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
                             <div
-                              className="absolute left-0 top-0 bottom-0 rounded-xl transition-all duration-700"
-                              style={{ width: `${wPct}%`, backgroundColor: barColor, opacity: 0.25 }}
+                              className="absolute left-0 bottom-0 right-0 rounded-b-xl transition-all duration-700"
+                              style={{ height: `${wPct}%`, backgroundColor: barColor, opacity: 0.3 }}
                             />
                             {isNow && (
-                              <div className="absolute left-0 top-0 bottom-0 w-full animate-pulse rounded-xl"
+                              <div className="absolute inset-0 animate-pulse rounded-xl"
                                 style={{ backgroundColor: G, opacity: 0.08 }} />
                             )}
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="text-[10px] font-extrabold leading-none" style={{ color: labelColor }}>
-                                W{wave}
+                              <span className="text-[11px] font-extrabold leading-none" style={{ color: labelColor }}>
+                                {wave}
                               </span>
                               {isNow && (
-                                <span className="text-[8px] font-bold uppercase tracking-wide mt-0.5" style={{ color: G }}>
+                                <span className="text-[7px] font-bold uppercase tracking-wide mt-0.5" style={{ color: G }}>
                                   now
                                 </span>
                               )}
                             </div>
                           </div>
                           {/* Served count */}
-                          <p className="text-center text-[10px] font-semibold mt-1" style={{ color: labelColor }}>
+                          <p className="text-center text-[9px] font-semibold mt-1" style={{ color: labelColor }}>
                             {wServed}/{wTotal}
                           </p>
                         </div>
