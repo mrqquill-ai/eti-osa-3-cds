@@ -1606,6 +1606,34 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Top pagination — sticky on mobile so it stays reachable in a long queue */}
+          {dashTab !== 'served' && filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
+            <div
+              className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-xl bg-white sticky top-[96px] z-30 lg:static lg:top-auto shadow-sm"
+              style={{ border: '1px solid #E0DDD6' }}
+            >
+              <button
+                onClick={() => { setTablePage(p => Math.max(0, p - 1)); window.scrollTo({ top: 0 }) }}
+                disabled={tablePage === 0}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40 active:opacity-70"
+                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+              >
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </button>
+              <span className="text-xs font-semibold" style={{ color: '#64748B' }}>
+                Page {tablePage + 1} of {Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE)}
+              </span>
+              <button
+                onClick={() => { setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1)); window.scrollTo({ top: 0 }) }}
+                disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40 active:opacity-70"
+                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* List — All + This Wave tabs on mobile, always on desktop */}
           <div className={`bg-white rounded-xl overflow-hidden ${dashTab === 'served' ? 'hidden lg:block' : ''}`} style={{ border: '1px solid #E0DDD6' }}>
             {activeRows.length === 0 && (
