@@ -195,7 +195,7 @@ export default function SettingsPage() {
   }
 
   async function startNewSession() {
-    if (newBatchSize < 10 || newBatchSize > 100) { setError('Wave size must be 10–100.'); return }
+    if (newBatchSize < 5 || newBatchSize > 100) { setError('Wave size must be between 5 and 100.'); return }
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.rpc('admin_reset_day', { p_batch_size: newBatchSize })
@@ -206,7 +206,7 @@ export default function SettingsPage() {
   }
 
   async function changeBatchSize() {
-    if (newBatchSize < 10 || newBatchSize > 100) { setError('Wave size must be 10–100.'); return }
+    if (newBatchSize < 5 || newBatchSize > 100) { setError('Wave size must be between 5 and 100.'); return }
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.from('session_settings').update({ batch_size: newBatchSize }).eq('id', 1)
@@ -488,10 +488,10 @@ export default function SettingsPage() {
         >
           <div className="mb-3">
             <label className="block text-sm font-semibold mb-1.5" style={{ color: INK }}>
-              Wave size <span style={{ color: MUTED }}>(10–100)</span>
+              Wave size <span style={{ color: MUTED }}>(5 to 100)</span>
             </label>
             <input
-              type="number" min={10} max={100}
+              type="number" min={5} max={100}
               value={newBatchSize}
               onChange={e => setNewBatchSize(Number(e.target.value))}
               className="w-full rounded-xl px-4 py-3 text-lg font-bold outline-none border-2 border-slate-200 focus:border-emerald-700"
@@ -513,7 +513,7 @@ export default function SettingsPage() {
         >
           <div className="mb-3">
             <input
-              type="number" min={10} max={100}
+              type="number" min={5} max={100}
               value={newBatchSize}
               onChange={e => setNewBatchSize(Number(e.target.value))}
               className="w-full rounded-xl px-4 py-3 text-lg font-bold text-center outline-none border-2 border-slate-200 focus:border-emerald-700"

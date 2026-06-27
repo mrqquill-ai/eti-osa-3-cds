@@ -13,13 +13,17 @@ const LINE  = '#E2E8F0'
 export default function Manager() {
   const navigate = useNavigate()
 
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+
   // Redirect to /login if no active session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) navigate('/login', { replace: true })
+      else setIsSuperAdmin(session.user?.user_metadata?.role === 'super_admin')
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) navigate('/login', { replace: true })
+      else setIsSuperAdmin(session.user?.user_metadata?.role === 'super_admin')
     })
     return () => subscription.unsubscribe()
   }, [navigate])
@@ -614,7 +618,8 @@ export default function Manager() {
             )}
           </div>
 
-          {/* Check-in Link Card */}
+          {/* Check-in Link Card — super admin only (prevents execs sharing the link) */}
+          {isSuperAdmin && (
           <div className="bg-white rounded-2xl p-5" style={{ border: `1px solid ${LINE}` }}>
             <h2 className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: MUTED }}>Check-in Link</h2>
             <p className="text-xs mb-4" style={{ color: MUTED }}>
@@ -701,6 +706,7 @@ export default function Manager() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Recent (mobile only – desktop has live feed on right) */}
           {recentRegs.length > 0 && (
