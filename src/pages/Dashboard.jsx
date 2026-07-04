@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import jsQR from 'jsqr'
 import { supabase } from '../lib/supabase.js'
+import { T } from '../lib/tokens.js'
 
 const SORTABLE = [
   { key: 'queue_number', label: 'Q#' },
@@ -53,30 +54,6 @@ export default function Dashboard() {
   const [editQueueNumber,  setEditQueueNumber]  = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
           
-  // Super admin panel
-  const [superTab, setSuperTab] = useState(null) // null=home menu, string=open panel
-  const [superOpen, setSuperOpen] = useState(false) // collapsed by default
-  // Exec approvals
-  const [execList,          setExecList]          = useState([])
-  const [execListLoading,   setExecListLoading]   = useState(false)
-  const [approvingId,       setApprovingId]       = useState(null)
-  const [rejectingId,       setRejectingId]       = useState(null)
-  const [rejectReason,      setRejectReason]      = useState('')
-  const [showRejectSheet,   setShowRejectSheet]   = useState(null) // user_id string | null
-  const [activityLog, setActivityLog] = useState([])
-  const [logLoading, setLogLoading] = useState(false)
-  const [announcement, setAnnouncement] = useState('')
-  const [execSessions, setExecSessions] = useState([])
-  const [archiveDates, setArchiveDates] = useState([])
-  const [archiveRows, setArchiveRows] = useState([])
-  const [archiveDate, setArchiveDate] = useState(null)
-  const [duplicates, setDuplicates] = useState([])
-  // Venue / geo settings
-  const [venueGeoEnabled, setVenueGeoEnabled] = useState(true)
-  const [venueLat, setVenueLat] = useState('6.4360344')
-  const [venueLng, setVenueLng] = useState('3.523451')
-  const [venueRadius, setVenueRadius] = useState('350')
-  const [venueSuccess, setVenueSuccess] = useState('')
   const [showMoveWaveModal, setShowMoveWaveModal] = useState(null)
   const [targetWave, setTargetWave] = useState(1)
   const [showNoteModal, setShowNoteModal] = useState(null)
@@ -105,7 +82,6 @@ export default function Dashboard() {
   const [pendingBatchSize, setPendingBatchSize] = useState(30)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetConfirmText, setResetConfirmText] = useState('')
-  const [showEmptyBatchConfirm, setShowEmptyBatchConfirm] = useState(false)
   const [showVoidConfirm, setShowVoidConfirm] = useState(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
       const [busy, setBusy] = useState(false)
@@ -138,7 +114,6 @@ export default function Dashboard() {
       setRole(detectedRole)
       setUserName(meta.full_name || '')
       setUserRole(meta.role || '')
-      if (detectedRole === 'super_admin') loadExecList()
 
 
 
@@ -379,16 +354,8 @@ export default function Dashboard() {
     try {
       const { data, error: e } = await supabase.rpc('admin_call_next_batch')
       if (e) throw e
-      flash(`Now calling wave ${data}.`)
+      flash(`Wave ${data} called.`)
     } catch (e) { showError(e) } finally { setBusy(false) }
-  }
-
-  function handleCallNextBatch() {
-    if (nextBatchCount === 0) {
-      setShowEmptyBatchConfirm(true)
-    } else {
-      setShowCallWaveConfirm(true)
-    }
   }
 
   function exportCSV() {
@@ -541,16 +508,6 @@ export default function Dashboard() {
     } finally { setBusy(false) }
   }
 
-  async function superRenumberQueue() {
-    setBusy(true); setError('')
-    try {
-      const { data, error: e } = await supabase.rpc('super_admin_renumber_queue')
-      if (e) throw e
-      flash(`Queue renumbered — ${data} entries updated from #1.`)
-    } catch (e) {
-      setError(e?.message || 'Could not renumber queue.')
-    } finally { setBusy(false) }
-  }
 
   async function superDeleteRegistration() {
     if (!showDeleteConfirm) return
@@ -567,91 +524,6 @@ export default function Dashboard() {
 
 
 
-  // ── Super Admin panel loaders ────────────────────────────
-  async function loadExecList() {
-    setExecListLoading(true)
-    try {
-      const { data } = await supabase.rpc('super_admin_list_execs')
-      if (data) setExecList(data)
-    } catch (e) { showError(e) } finally { setExecListLoading(false) }
-  }
-
-  async function approveExec(userId) {
-    setApprovingId(userId)
-    try {
-      const { error: e } = await supabase.rpc('super_admin_approve_exec', { p_user_id: userId })
-      if (e) throw e
-      setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'approved', reviewed_at: new Date().toISOString(), rejection_reason: null } : p))
-      flash('Access approved.')
-    } catch (e) { showError(e) } finally { setApprovingId(null) }
-  }
-
-  async function rejectExec(userId) {
-    setRejectingId(userId)
-    try {
-      const { error: e } = await supabase.rpc('super_admin_reject_exec', { p_user_id: userId, p_reason: rejectReason.trim() })
-      if (e) throw e
-      setExecList(prev => prev.map(p => p.id === userId ? { ...p, status: 'rejected', reviewed_at: new Date().toISOString(), rejection_reason: rejectReason.trim() } : p))
-      flash('Access rejected.')
-      setShowRejectSheet(null)
-      setRejectReason('')
-    } catch (e) { showError(e) } finally { setRejectingId(null) }
-  }
-
-  async function loadActivityLog() {
-    setLogLoading(true)
-    try {
-      const { data } = await supabase.rpc('super_admin_get_activity_log', { p_limit: 100 })
-      if (data) setActivityLog(data)
-    } catch {} finally { setLogLoading(false) }
-  }
-
-  async function loadExecSessions() {
-    try {
-      const { data } = await supabase.rpc('super_admin_get_active_sessions')
-      if (data) setExecSessions(data)
-    } catch {}
-  }
-
-  async function loadArchiveDates() {
-    try {
-      const { data } = await supabase.rpc('super_admin_get_archive_dates')
-      if (data) setArchiveDates(data)
-    } catch {}
-  }
-
-  async function loadArchiveForDate(date) {
-    setArchiveDate(date)
-    try {
-      const { data } = await supabase.rpc('super_admin_get_archives', { p_date: date })
-      if (data) setArchiveRows(data)
-    } catch {}
-  }
-
-  async function loadDuplicates() {
-    try {
-      const { data } = await supabase.rpc('super_admin_find_duplicates')
-      if (data) setDuplicates(data)
-    } catch {}
-  }
-
-  async function saveAnnouncement() {
-    setBusy(true); setError('')
-    try {
-      const { error: e } = await supabase.rpc('super_admin_set_announcement', { p_announcement: announcement })
-      if (e) throw e
-      flash(announcement ? 'Announcement published to all status pages.' : 'Announcement cleared.')
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
-
-  async function toggleFreeze() {
-    setBusy(true); setError('')
-    try {
-      const { data, error: e } = await supabase.rpc('super_admin_toggle_freeze')
-      if (e) throw e
-      flash(data ? 'Executive actions are now frozen. Only you can act.' : 'Executive actions unfrozen.')
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
 
   async function moveToWave() {
     if (!showMoveWaveModal || !targetWave) return
@@ -833,48 +705,6 @@ export default function Dashboard() {
     }
     prevRegisteredRef.current = current
   }, [rows, soundEnabled])
-
-  // Load super admin panel data when tab changes
-  useEffect(() => {
-    if (!isSuperAdmin || !superTab) return
-    if (superTab === 'approvals') loadExecList()
-    if (superTab === 'log') loadActivityLog()
-    if (superTab === 'sessions') loadExecSessions()
-    if (superTab === 'archives') loadArchiveDates()
-    if (superTab === 'duplicates') loadDuplicates()
-    if (superTab === 'announce' && settings) setAnnouncement(settings.announcement || '')
-    if (superTab === 'venue' && settings) {
-      setVenueGeoEnabled(settings.geofencing_enabled ?? true)
-      setVenueLat(String(settings.venue_lat ?? '6.4360344'))
-      setVenueLng(String(settings.venue_lng ?? '3.523451'))
-      setVenueRadius(String(settings.venue_radius_m ?? '350'))
-    }
-  }, [superTab])
-
-  // Save venue / geofencing settings (super admin)
-  async function saveVenueSettings() {
-    const lat = parseFloat(venueLat)
-    const lng = parseFloat(venueLng)
-    const radius = parseInt(venueRadius, 10)
-    if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius < 50) {
-      showError({ message: 'Invalid coordinates or radius (minimum 50m).' }); return
-    }
-    setBusy(true); setVenueSuccess('')
-    try {
-      const { error: e } = await supabase.rpc('super_admin_update_geo_settings', {
-        p_geofencing_enabled: venueGeoEnabled,
-        p_venue_lat:          lat,
-        p_venue_lng:          lng,
-        p_venue_radius_m:     radius,
-      })
-      if (e) throw e
-      setVenueSuccess('Venue settings saved!')
-      // Update local settings cache
-      setSettings(prev => prev ? { ...prev, geofencing_enabled: venueGeoEnabled, venue_lat: lat, venue_lng: lng, venue_radius_m: radius } : prev)
-      setTimeout(() => setVenueSuccess(''), 3000)
-    } catch (e) { showError(e) } finally { setBusy(false) }
-  }
-
   // Toggle geofencing on/off (executive + super admin)
   async function toggleGeofencing() {
     setBusy(true)
@@ -921,694 +751,195 @@ export default function Dashboard() {
 
       {/* ── Error banner ── */}
       {error && (
-        <div className="mb-3 rounded-xl p-3 flex items-start gap-3" style={{ backgroundColor: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.3)' }}>
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#C0392B' }} />
+        <div className="mb-3 rounded-xl p-3 flex items-start gap-3" style={{ backgroundColor: T.dangerTint, border: `1px solid ${T.danger}` }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: T.danger }} />
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold" style={{ color: '#C0392B' }}>Something went wrong</div>
-            <div className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: '#C0392B' }}>{error}</div>
+            <div className="text-sm font-bold" style={{ color: T.danger }}>Something went wrong</div>
+            <div className="text-sm mt-0.5 whitespace-pre-wrap" style={{ color: T.danger }}>{error}</div>
           </div>
           <button onClick={() => setError('')} aria-label="Dismiss">
-            <X className="w-4 h-4" style={{ color: '#C0392B' }} />
+            <X className="w-4 h-4" style={{ color: T.danger }} />
           </button>
         </div>
       )}
 
       {/* ── Timeout warning ── */}
       {timeoutWarning && (
-        <div className="mb-3 rounded-xl p-3 flex items-center gap-2 animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.4)' }}>
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#F59B0A' }} />
-          <span className="text-sm font-semibold" style={{ color: '#92640A' }}>Session will lock in ~2 minutes. Tap anywhere to stay logged in.</span>
+        <div className="mb-3 rounded-xl p-3 flex items-center gap-2 animate-pulse" style={{ backgroundColor: T.waitingTint, border: `1px solid ${T.waiting}` }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: T.waiting }} />
+          <span className="text-sm font-semibold" style={{ color: T.waiting }}>Session will lock in ~2 minutes. Tap anywhere to stay logged in.</span>
         </div>
       )}
 
-      {/* ── Personalised greeting ── */}
-      {userName && (
-        <div className="mb-4 rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3"
-          style={{ backgroundColor: '#1B6B3A' }}>
-          <div>
-            <div className="text-white font-extrabold text-base leading-tight">
-              {(() => {
-                const h = new Date().getHours()
-                const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
-                const firstName = userName.split(' ')[0]
-                return `${greeting}, ${firstName} 👋`
-              })()}
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)' }}>
-                {isSuperAdmin ? '⚡ Super Admin' : userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1).replace(/_/g, ' ') : 'Executive'}
-              </span>
-              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>· Eti-Osa 3 Special CDS</span>
-            </div>
-          </div>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-extrabold flex-shrink-0"
-            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#fff' }}>
-            {userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-          </div>
-        </div>
-      )}
 
-      {/* ── Status chips ── */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-4 pb-0.5">
-        <span className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white" style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}>
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F59B0A' }} />
-          Size: {settings?.batch_size ?? '—'}/wave
-        </span>
-        <span
-          className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white"
-          style={{ border: '1px solid #E0DDD6', color: settings?.registration_open ? '#1B6B3A' : '#64748B' }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: settings?.registration_open ? '#1B6B3A' : '#64748B' }} />
-          {settings?.registration_open ? 'Reg. open' : 'Reg. closed'}
-        </span>
-        <button
-          onClick={toggleGeofencing}
-          disabled={busy || !settings}
-          className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full bg-white transition-opacity disabled:opacity-50"
-          style={{ border: '1px solid #E0DDD6', color: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#64748B' }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: (settings?.geofencing_enabled ?? true) ? '#1B6B3A' : '#64748B' }} />
-          Location: {(settings?.geofencing_enabled ?? true) ? 'ON' : 'OFF'}
-        </button>
-      </div>
 
-      {/* ── Frozen banner ── */}
+      {/* ── Frozen banner (execs only) ── */}
       {!isSuperAdmin && settings?.exec_frozen && (
-        <div className="mb-3 rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: 'rgba(27,107,58,0.06)', border: '1px solid rgba(27,107,58,0.2)' }}>
-          <Lock className="w-4 h-4 flex-shrink-0" style={{ color: '#1B6B3A' }} />
-          <span className="text-sm font-semibold" style={{ color: '#1B6B3A' }}>Actions are frozen by the super admin.</span>
+        <div className="mb-3 rounded-xl p-3 flex items-center gap-2" style={{ backgroundColor: T.brandTint, border: `1px solid ${T.brand}` }}>
+          <Lock className="w-4 h-4 flex-shrink-0" style={{ color: T.brand }} />
+          <span className="text-sm font-semibold" style={{ color: T.brand }}>Actions are frozen by the super admin.</span>
         </div>
       )}
 
-      {/* ════ DESKTOP ONLY: stats strip + action/search bar ════ */}
-      <div className="hidden lg:block mb-5 space-y-3">
-        {/* 4-column stat strip */}
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E0DDD6', borderLeft: '4px solid #F59B0A' }}>
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Now Serving</div>
-            <div className="text-2xl font-extrabold leading-none" style={{ color: '#0F172A' }}>
-              {settings?.current_batch ? `Wave ${settings.current_batch}` : '—'}
-            </div>
-            {currentWaveProgress && (
-              <div className="text-xs font-medium mt-1.5" style={{ color: '#94A3B8' }}>
-                {currentWaveProgress.served} / {currentWaveProgress.total} served
-              </div>
-            )}
-          </div>
-          <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E0DDD6' }}>
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Registered</div>
-            <div className="text-2xl font-extrabold" style={{ color: '#0F172A' }}>{counts.registered}</div>
-          </div>
-          <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E0DDD6' }}>
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Waiting</div>
-            <div className="text-2xl font-extrabold" style={{ color: '#F59B0A' }}>{counts.waiting}</div>
-          </div>
-          <div className="bg-white rounded-xl p-4" style={{ border: '1px solid #E0DDD6' }}>
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Served</div>
-            <div className="text-2xl font-extrabold" style={{ color: '#1B6B3A' }}>{counts.served}</div>
-          </div>
-        </div>
-
-        {/* Action bar + search */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleCallNextBatch}
-            disabled={busy || !settings}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm transition-opacity active:opacity-80 disabled:opacity-40"
-            style={{ backgroundColor: '#1B6B3A' }}
-          >
-            <ChevronRight className="w-4 h-4" />
-            Call Next Wave → {nextBatchNumber}
-            {nextBatchCount > 0 && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-                {nextBatchCount}
-              </span>
-            )}
-          </button>
-          {settings?.current_batch > 0 && (
+      {/* ═══ Band 2: Wave console ═══ */}
+      <section
+        aria-label="Wave control"
+        className="rounded-2xl p-4 mb-3"
+        style={{ backgroundColor: T.raised, border: `1px solid ${T.line}` }}
+      >
+        {/* Status line: single source of truth for wave state */}
+        <div className="flex items-center justify-between gap-2 min-h-[24px]">
+          <p className="text-base font-bold" style={{ color: T.textPrimary }}>
+            {currentWave > 0 ? `Wave ${currentWave} active` : 'No wave called yet'}
+          </p>
+          {currentWave > 0 && (
             <button
               onClick={goBackBatch}
               disabled={busy}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80 disabled:opacity-40"
-              style={{ backgroundColor: '#F1F5F9', color: '#475569' }}
+              className="text-xs font-semibold px-3 py-2 -my-2 rounded-lg transition-opacity active:opacity-70 disabled:opacity-40 min-h-[44px]"
+              style={{ color: T.textSecondary }}
             >
-              <ChevronLeft className="w-4 h-4" />
-              Undo wave call
+              Undo last call
             </button>
           )}
-          <div className="flex-1" />
-          <div className="relative w-72">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#94A3B8' }} />
+        </div>
+        {currentWave > 0 && currentWaveProgress && (
+          <p className="text-xs mt-0.5" style={{ color: T.textSecondary }}>
+            {currentWaveProgress.served} of {currentWaveProgress.total} served in this wave
+          </p>
+        )}
+
+        {/* Stat strip: announced politely to screen readers on change */}
+        <div aria-live="polite" className="grid grid-cols-3 gap-2 mt-3">
+          {[
+            { label: 'Registered', value: counts.registered, color: T.textPrimary, bg: T.sunken },
+            { label: 'Waiting',    value: counts.waiting,    color: T.waiting,     bg: T.waitingTint },
+            { label: 'Served',     value: counts.served,     color: T.served,      bg: T.servedTint },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} className="rounded-xl px-2 py-2.5 text-center" style={{ backgroundColor: bg }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: T.textSecondary }}>{label}</p>
+              <p className="text-xl font-extrabold leading-tight tabular-nums" style={{ color }}>{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Config: interactive pills for super admin, read-only micro-text for admins */}
+        {isSuperAdmin ? (
+          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => navigate('/settings')}
+              className="inline-flex items-center gap-1 flex-shrink-0 text-xs font-semibold pl-3 pr-2 rounded-full min-h-[44px] transition-opacity active:opacity-70"
+              style={{ border: `1px solid ${T.line}`, color: T.textPrimary, backgroundColor: T.raised }}
+            >
+              {settings?.batch_size ?? '…'} per wave
+              <ChevronRight className="w-3.5 h-3.5" style={{ color: T.textSecondary }} />
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="inline-flex items-center gap-1 flex-shrink-0 text-xs font-semibold pl-3 pr-2 rounded-full min-h-[44px] transition-opacity active:opacity-70"
+              style={{ border: `1px solid ${T.line}`, color: settings?.registration_open ? T.served : T.textSecondary, backgroundColor: T.raised }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: settings?.registration_open ? T.served : T.line }} />
+              Registration {settings?.registration_open ? 'open' : 'closed'}
+              <ChevronRight className="w-3.5 h-3.5" style={{ color: T.textSecondary }} />
+            </button>
+            <button
+              onClick={toggleGeofencing}
+              disabled={busy || !settings}
+              role="switch"
+              aria-checked={settings?.geofencing_enabled ?? true}
+              className="inline-flex items-center gap-1.5 flex-shrink-0 text-xs font-semibold px-3 rounded-full min-h-[44px] transition-opacity active:opacity-70 disabled:opacity-50"
+              style={{ border: `1px solid ${T.line}`, color: (settings?.geofencing_enabled ?? true) ? T.served : T.textSecondary, backgroundColor: (settings?.geofencing_enabled ?? true) ? T.brandTint : T.raised }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: (settings?.geofencing_enabled ?? true) ? T.served : T.line }} />
+              Location {(settings?.geofencing_enabled ?? true) ? 'on' : 'off'}
+            </button>
+          </div>
+        ) : (
+          <p className="text-[11px] mt-3" style={{ color: T.textSecondary }}>
+            {settings?.batch_size ?? '…'} per wave · Registration {settings?.registration_open ? 'open' : 'closed'} · Location {(settings?.geofencing_enabled ?? true) ? 'on' : 'off'}
+          </p>
+        )}
+
+        {/* Primary CTA: the single solid-green element on this screen */}
+        <button
+          onClick={() => setShowCallWaveConfirm(true)}
+          disabled={busy || !settings || nextBatchCount === 0}
+          className="w-full mt-3 min-h-[48px] rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-opacity active:opacity-80 disabled:opacity-50"
+          style={{ backgroundColor: T.brand, color: T.onBrand }}
+        >
+          {nextBatchCount === 0
+            ? 'No one waiting'
+            : `Call Wave ${nextBatchNumber} · ${nextBatchCount} waiting`}
+        </button>
+      </section>
+
+      {/* ═══ Band 3: Find ═══ */}
+      <section aria-label="Find a member" className="mb-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: T.textSecondary }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
               placeholder="Search by name or state code…"
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-sm outline-none"
-              style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
-              onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
-              onBlur={e => { e.target.style.borderColor = '#E0DDD6'; e.target.style.boxShadow = 'none' }}
+              className="w-full h-12 pl-10 pr-4 rounded-xl text-sm outline-none"
+              style={{ backgroundColor: T.raised, border: `1px solid ${T.line}`, color: T.textPrimary }}
             />
           </div>
-          <span className="text-xs font-medium flex-shrink-0" style={{ color: '#94A3B8' }}>
-            {filteredAndSortedRows.length} members
-          </span>
-        </div>
-      </div>
-
-      {/* ── Call Next Wave (mobile only) ── */}
-      <button
-        onClick={handleCallNextBatch}
-        disabled={busy || !settings}
-        className="lg:hidden w-full flex items-center justify-center gap-2 mb-2 py-4 rounded-xl text-white font-bold text-base transition-opacity active:opacity-80 disabled:opacity-40"
-        style={{ backgroundColor: '#1B6B3A' }}
-      >
-        <ChevronRight className="w-5 h-5" />
-        Call Next Wave
-        {settings?.current_batch >= 0 && (
-          <span className="font-extrabold">&rarr; {nextBatchNumber}</span>
-        )}
-        {nextBatchCount > 0 && (
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-            {nextBatchCount}
-          </span>
-        )}
-      </button>
-
-      {/* ── Go back to previous wave (mobile only) ── */}
-      {settings?.current_batch > 0 && (
-        <button
-          onClick={goBackBatch}
-          disabled={busy}
-          className="lg:hidden w-full flex items-center justify-center gap-2 mb-4 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80 disabled:opacity-40"
-          style={{ backgroundColor: '#F1F5F9', color: '#475569' }}
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Undo last wave call
-        </button>
-      )}
-
-      {/* ── Mobile always-visible stats strip ── */}
-      <div className="lg:hidden grid grid-cols-4 gap-2 mb-3">
-        {[
-          { label: 'Wave',       value: currentWave > 0 ? `W${currentWave}` : '—', color: '#92400E', bg: 'rgba(245,155,10,0.08)' },
-          { label: 'Registered', value: counts.registered, color: '#1B6B3A',  bg: 'rgba(27,107,58,0.06)'  },
-          { label: 'Waiting',    value: counts.waiting,    color: '#F59B0A',  bg: 'rgba(245,155,10,0.08)' },
-          { label: 'Served',     value: counts.served,     color: '#166534',  bg: 'rgba(22,101,52,0.06)'  },
-        ].map(({ label, value, color, bg }) => (
-          <div key={label} className="rounded-xl px-2 py-2 text-center" style={{ backgroundColor: bg, border: '1px solid rgba(0,0,0,0.06)' }}>
-            <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: '#94A3B8' }}>{label}</p>
-            <p className="text-base font-extrabold leading-tight" style={{ color }}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── 3-tab segmented control — mobile only ── */}
-      <div className="flex mb-3 p-0.5 rounded-xl lg:hidden" style={{ backgroundColor: '#E2E8F0' }}>
-        {[
-          { key: 'all',    label: 'All',       count: counts.registered },
-          { key: 'wave',   label: 'This Wave', count: waveFilteredRows.length },
-          { key: 'served', label: 'Served',    count: counts.served },
-        ].map(({ key, label, count }) => (
           <button
-            key={key}
-            onClick={() => setDashTab(key)}
-            className="flex-1 py-2 text-xs font-semibold rounded-[10px] transition-all flex items-center justify-center gap-1"
-            style={{
-              backgroundColor: dashTab === key ? 'white' : 'transparent',
-              color:           dashTab === key ? '#0F172A' : '#64748B',
-              boxShadow:       dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            }}
+            onClick={startQRScan}
+            aria-label="Scan member pass"
+            title="Scan member pass"
+            className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-opacity active:opacity-70"
+            style={{ backgroundColor: T.brandTint, color: T.brand, border: `1px solid ${T.line}` }}
           >
-            {label}
-            <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+            <ScanLine className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Filter tabs (mobile; desktop table always shows all) */}
+        <div className="flex mt-2 p-0.5 rounded-xl lg:hidden" style={{ backgroundColor: T.sunken }}>
+          {[
+            { key: 'all',    label: 'All',       count: counts.registered },
+            { key: 'wave',   label: 'This Wave', count: waveFilteredRows.length },
+            { key: 'served', label: 'Served',    count: counts.served },
+          ].map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setDashTab(key)}
+              aria-pressed={dashTab === key}
+              className="flex-1 min-h-[44px] text-xs font-semibold rounded-[10px] transition-all flex items-center justify-center gap-1"
               style={{
-                backgroundColor: dashTab === key ? '#E2E8F0' : 'transparent',
-                color:           dashTab === key ? '#475569' : '#94A3B8',
+                backgroundColor: dashTab === key ? T.raised : 'transparent',
+                color:           dashTab === key ? T.textPrimary : T.textSecondary,
+                boxShadow:       dashTab === key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               }}
             >
-              {count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* ═══ Super Admin panel — always visible ═══ */}
-      <div className="space-y-3">
-          {/* ── Super Admin Panel ── */}
-          {isSuperAdmin && (() => {
-            const pendingCount = execList.filter(p => p.status === 'pending').length
-            const tabMeta = {
-              approvals:  { icon: '👤', label: 'Approvals',    desc: pendingCount > 0 ? `${pendingCount} pending` : 'Manage exec accounts' },
-              announce:   { icon: '📢', label: 'Announce',     desc: 'Broadcast to all members' },
-              log:        { icon: '📋', label: 'Activity',     desc: 'Recent admin actions' },
-              sessions:   { icon: '🔑', label: 'Sessions',     desc: 'Active exec logins' },
-              archives:   { icon: '🗄', label: 'Archives',     desc: 'Past session records' },
-              duplicates: { icon: '⚠️', label: 'Duplicates',   desc: 'Flag suspicious entries' },
-              venue:      { icon: '📍', label: 'Venue',        desc: 'Location & geofence' },
-            }
-            return (
-              <div className="rounded-2xl overflow-hidden mt-2" style={{ border: '1px solid #E0DDD6' }}>
-
-                {/* Header — click to expand/collapse */}
-                <button
-                  onClick={() => { setSuperOpen(o => !o); if (!superOpen) setSuperTab(null) }}
-                  className="w-full px-4 py-3 flex items-center gap-3 transition-opacity active:opacity-80"
-                  style={{ backgroundColor: '#1B6B3A' }}
-                >
-                  {superTab && superOpen ? (
-                    <button onClick={e => { e.stopPropagation(); setSuperTab(null) }} className="flex items-center gap-1.5 text-white opacity-80 hover:opacity-100 transition-opacity">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
-                    </button>
-                  ) : (
-                    <ShieldCheck className="w-4 h-4 text-white flex-shrink-0" />
-                  )}
-                  <span className="text-white font-bold text-sm flex-1 text-left">
-                    {superTab && superOpen ? tabMeta[superTab]?.label : 'Super Admin'}
-                  </span>
-                  {pendingCount > 0 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EF4444', color: '#fff' }}>
-                      {pendingCount}
-                    </span>
-                  )}
-                  <svg
-                    className="w-4 h-4 text-white opacity-70 flex-shrink-0 transition-transform duration-200"
-                    style={{ transform: superOpen ? 'rotate(180deg)' : 'none' }}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* ── Home menu ── */}
-                {superOpen && !superTab && (
-                  <div className="bg-white p-3 space-y-3">
-
-                    {/* Quick actions */}
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#94A3B8' }}>Quick Actions</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['announce', 'venue']).map(key => (
-                          <button key={key} onClick={() => setSuperTab(key)}
-                            className="flex flex-col items-start gap-1 p-3 rounded-xl text-left transition-colors active:opacity-70"
-                            style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                            <span className="text-xl">{tabMeta[key].icon}</span>
-                            <span className="text-sm font-bold" style={{ color: '#0F172A' }}>{tabMeta[key].label}</span>
-                            <span className="text-[11px] leading-tight" style={{ color: '#94A3B8' }}>{tabMeta[key].desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Renumber queue — critical fix tool */}
-                    <button
-                      onClick={superRenumberQueue}
-                      disabled={busy}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors active:opacity-70 disabled:opacity-40"
-                      style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '1px solid rgba(245,155,10,0.3)' }}
-                    >
-                      <span className="text-lg">🔢</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold" style={{ color: '#92400E' }}>Renumber Queue</div>
-                        <div className="text-[11px]" style={{ color: '#B45309' }}>Close gaps — reassigns #1, #2, #3… in order</div>
-                      </div>
-                    </button>
-
-                    {/* Management list */}
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1" style={{ color: '#94A3B8' }}>Management</p>
-                      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E2E8F0' }}>
-                        {(['approvals', 'log', 'sessions', 'archives', 'duplicates']).map((key, i, arr) => (
-                          <button key={key} onClick={() => setSuperTab(key)}
-                            className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-50"
-                            style={{ borderBottom: i < arr.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                            <span className="text-lg w-6 flex-shrink-0">{tabMeta[key].icon}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>{tabMeta[key].label}</div>
-                              <div className="text-[11px] mt-0.5" style={{ color: '#94A3B8' }}>{tabMeta[key].desc}</div>
-                            </div>
-                            {key === 'approvals' && pendingCount > 0 && (
-                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}>
-                                {pendingCount}
-                              </span>
-                            )}
-                            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: '#CBD5E1' }} />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Approvals panel ── */}
-                {superOpen && superTab === 'approvals' && (
-                  <div className="bg-white">
-                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Exec Access Requests</span>
-                      <button onClick={loadExecList} disabled={execListLoading} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>
-                        {execListLoading ? 'Loading…' : 'Refresh'}
-                      </button>
-                    </div>
-                    {execListLoading && <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>Loading…</div>}
-                    {!execListLoading && execList.length === 0 && <div className="py-8 text-center text-sm" style={{ color: '#64748B' }}>No exec accounts found.</div>}
-                    {!execListLoading && execList.length > 0 && (
-                      <div className="divide-y" style={{ borderColor: '#E0DDD6' }}>
-                        {execList.map(p => (
-                          <div key={p.id} className="px-4 py-3">
-                            <div className="flex items-start gap-3">
-                              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                                style={{
-                                  backgroundColor: p.status === 'approved' ? 'rgba(27,107,58,0.12)' : p.status === 'rejected' ? 'rgba(192,57,43,0.1)' : 'rgba(201,151,58,0.15)',
-                                  color: p.status === 'approved' ? '#1B6B3A' : p.status === 'rejected' ? '#C0392B' : '#A67C2E',
-                                }}>
-                                {(p.full_name || p.email || '?')[0].toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{p.full_name || '(no name)'}</span>
-                                  <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0"
-                                    style={{
-                                      backgroundColor: p.status === 'approved' ? 'rgba(27,107,58,0.1)' : p.status === 'rejected' ? 'rgba(192,57,43,0.1)' : 'rgba(201,151,58,0.15)',
-                                      color: p.status === 'approved' ? '#1B6B3A' : p.status === 'rejected' ? '#C0392B' : '#A67C2E',
-                                    }}>
-                                    {p.status}
-                                  </span>
-                                </div>
-                                <div className="text-xs mt-0.5 truncate" style={{ color: '#64748B' }}>{p.email}</div>
-                                <div className="text-xs mt-0.5 font-mono" style={{ color: '#94A3B8' }}>{p.state_code || '—'} · {p.role}</div>
-                                {p.rejection_reason && <div className="text-xs mt-1 italic" style={{ color: '#C0392B' }}>Reason: {p.rejection_reason}</div>}
-                              </div>
-                            </div>
-                            {p.status === 'pending' && (
-                              <div className="flex gap-2 mt-2.5 pl-12">
-                                <button onClick={() => approveExec(p.id)} disabled={approvingId === p.id || rejectingId === p.id}
-                                  className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
-                                  style={{ backgroundColor: '#1B6B3A' }}>
-                                  {approvingId === p.id ? 'Approving…' : '✓ Approve'}
-                                </button>
-                                <button onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }} disabled={approvingId === p.id || rejectingId === p.id}
-                                  className="flex-1 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                                  style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}>
-                                  ✕ Reject
-                                </button>
-                              </div>
-                            )}
-                            {p.status === 'approved' && (
-                              <div className="mt-2.5 pl-12">
-                                <button onClick={() => { setShowRejectSheet(p.id); setRejectReason('') }} disabled={rejectingId === p.id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-40"
-                                  style={{ backgroundColor: 'rgba(192,57,43,0.07)', color: '#C0392B' }}>
-                                  Revoke access
-                                </button>
-                              </div>
-                            )}
-                            {p.status === 'rejected' && (
-                              <div className="mt-2.5 pl-12">
-                                <button onClick={() => approveExec(p.id)} disabled={approvingId === p.id}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity disabled:opacity-40"
-                                  style={{ backgroundColor: '#1B6B3A' }}>
-                                  {approvingId === p.id ? 'Approving…' : 'Reinstate'}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── Announce panel ── */}
-                {superOpen && superTab === 'announce' && (
-                  <div className="bg-white p-4 space-y-3">
-                    <p className="text-xs" style={{ color: '#64748B' }}>This message appears as a banner on every corps member's status page.</p>
-                    <textarea
-                      value={announcement}
-                      onChange={e => setAnnouncement(e.target.value)}
-                      rows={3}
-                      maxLength={200}
-                      placeholder="e.g. Wave 3 is now being called. Please proceed to the clearance desk."
-                      className="w-full rounded-xl px-3.5 py-3 text-sm outline-none resize-none"
-                      style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }}
-                    />
-                    <div className="flex gap-2">
-                      <button onClick={saveAnnouncement}
-                        className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
-                        style={{ backgroundColor: '#1B6B3A' }}>
-                        {announcement ? 'Publish' : 'Clear announcement'}
-                      </button>
-                      {announcement && (
-                        <button onClick={() => { setAnnouncement(''); saveAnnouncement() }}
-                          className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-80"
-                          style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}>
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Activity Log panel ── */}
-                {superOpen && superTab === 'log' && (
-                  <div className="bg-white">
-                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Recent Actions</span>
-                      <button onClick={loadActivityLog} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
-                    </div>
-                    {activityLog.length === 0
-                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No activity yet.</div>
-                      : <div className="divide-y max-h-72 overflow-y-auto" style={{ borderColor: '#F1F5F9' }}>
-                          {activityLog.map((item, i) => (
-                            <div key={i} className="px-4 py-2.5 flex items-start gap-3">
-                              <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: '#1B6B3A' }} />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium" style={{ color: '#0F172A' }}>{item.action?.replace(/_/g, ' ')}</div>
-                                {item.details && <div className="text-xs mt-0.5" style={{ color: '#64748B' }}>{item.details}</div>}
-                              </div>
-                              <div className="text-[11px] flex-shrink-0" style={{ color: '#94A3B8' }}>
-                                {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                    }
-                  </div>
-                )}
-
-                {/* ── Sessions panel ── */}
-                {superOpen && superTab === 'sessions' && (
-                  <div className="bg-white">
-                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Active Logins</span>
-                      <button onClick={loadExecSessions} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
-                    </div>
-                    {execSessions.length === 0
-                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No active sessions.</div>
-                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
-                          {execSessions.map((s, i) => (
-                            <div key={i} className="px-4 py-3 flex items-center justify-between">
-                              <div className="text-sm font-medium capitalize" style={{ color: '#0F172A' }}>{s.page?.replace('/', '') || 'Unknown page'}</div>
-                              <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: '#1B6B3A' }}>
-                                {s.device_count} active
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                    }
-                  </div>
-                )}
-
-                {/* ── Archives panel ── */}
-                {superOpen && superTab === 'archives' && (
-                  <div className="bg-white">
-                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Past Sessions</span>
-                      <button onClick={loadArchiveDates} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
-                    </div>
-                    {archiveDates.length === 0
-                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No archived sessions yet.</div>
-                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
-                          {archiveDates.map((a, i) => (
-                            <div key={i} className="px-4 py-3 flex items-center justify-between">
-                              <div className="text-sm font-medium" style={{ color: '#0F172A' }}>
-                                {new Date(a.session_date).toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                              </div>
-                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#F1F5F9', color: '#64748B' }}>
-                                {a.entry_count} members
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                    }
-                  </div>
-                )}
-
-                {/* ── Duplicates panel ── */}
-                {superOpen && superTab === 'duplicates' && (
-                  <div className="bg-white">
-                    <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#64748B' }}>Duplicate Entries</span>
-                      <button onClick={loadDuplicates} className="text-xs font-semibold" style={{ color: '#1B6B3A' }}>Refresh</button>
-                    </div>
-                    {duplicates.length === 0
-                      ? <div className="py-8 text-center text-sm" style={{ color: '#94A3B8' }}>No duplicates found.</div>
-                      : <div className="divide-y" style={{ borderColor: '#F1F5F9' }}>
-                          {duplicates.map((d, i) => (
-                            <div key={i} className="px-4 py-3 flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(239,68,68,0.1)' }}>
-                                <span className="text-sm">⚠️</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>{d.full_name}</div>
-                                <div className="text-xs font-mono mt-0.5" style={{ color: '#64748B' }}>{d.state_code}</div>
-                              </div>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}>
-                                ×{d.match_count}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                    }
-                  </div>
-                )}
-
-                {/* ── Venue panel ── */}
-                {superOpen && superTab === 'venue' && (
-                  <div className="bg-white p-4 space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                      <div>
-                        <div className="text-sm font-semibold" style={{ color: '#0F172A' }}>Geofencing</div>
-                        <div className="text-xs mt-0.5" style={{ color: '#94A3B8' }}>Require corps members to be at venue</div>
-                      </div>
-                      <button onClick={() => setVenueGeoEnabled(v => !v)}
-                        className="w-11 h-6 rounded-full transition-colors flex-shrink-0"
-                        style={{ backgroundColor: venueGeoEnabled ? '#1B6B3A' : '#CBD5E1' }}>
-                        <div className="w-4 h-4 bg-white rounded-full shadow transition-transform mx-1"
-                          style={{ transform: venueGeoEnabled ? 'translateX(18px)' : 'translateX(0)' }} />
-                      </button>
-                    </div>
-                    {venueGeoEnabled && (
-                      <div className="space-y-2">
-                        {[
-                          { label: 'Latitude', value: venueLat, set: setVenueLat, placeholder: '6.4360344' },
-                          { label: 'Longitude', value: venueLng, set: setVenueLng, placeholder: '3.523451' },
-                          { label: 'Radius (metres)', value: venueRadius, set: setVenueRadius, placeholder: '350' },
-                        ].map(({ label, value, set, placeholder }) => (
-                          <div key={label}>
-                            <label className="block text-xs font-semibold mb-1" style={{ color: '#64748B' }}>{label}</label>
-                            <input type="text" value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
-                              className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none font-mono"
-                              style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {venueSuccess && <div className="text-xs font-semibold text-center py-2 rounded-lg" style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}>{venueSuccess}</div>}
-                    <button onClick={saveVenueSettings}
-                      className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80"
-                      style={{ backgroundColor: '#1B6B3A' }}>
-                      Save venue settings
-                    </button>
-                  </div>
-                )}
-
-              </div>
-            )
-          })()}
-
-          {/* ── Reject / Revoke sheet ── */}
-          {showRejectSheet && (
-            <div className="fixed inset-0 z-[100]">
-              <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRejectSheet(null)} />
-              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl px-5 pt-5" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
-                <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-4" />
-                <h3 className="text-base font-bold mb-1" style={{ color: '#0F172A' }}>
-                  {execList.find(p => p.id === showRejectSheet)?.status === 'approved'
-                    ? 'Revoke access'
-                    : 'Reject access request'}
-                </h3>
-                <p className="text-sm mb-3" style={{ color: '#64748B' }}>
-                  Optional: give a reason (the exec will see this).
-                </p>
-                <textarea
-                  value={rejectReason}
-                  onChange={e => setRejectReason(e.target.value)}
-                  placeholder="e.g. Not a registered exec for this CDS group."
-                  rows={3}
-                  className="w-full rounded-xl px-3.5 py-3 text-sm outline-none resize-none"
-                  style={{ border: '1.5px solid #E2E8F0', color: '#0F172A' }}
-                />
-                <div className="flex gap-3 mt-3">
-                  <button
-                    onClick={() => setShowRejectSheet(null)}
-                    className="flex-1 py-3 rounded-xl text-sm font-semibold border"
-                    style={{ borderColor: '#E2E8F0', color: '#0F172A' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => rejectExec(showRejectSheet)}
-                    disabled={rejectingId === showRejectSheet}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold disabled:opacity-50"
-                    style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B', border: '1px solid #C0392B' }}
-                  >
-                    {rejectingId === showRejectSheet ? 'Please wait…' : 'Confirm reject'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              {label}
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums"
+                style={{
+                  backgroundColor: dashTab === key ? T.sunken : 'transparent',
+                  color: T.textSecondary,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
+      </section>
 
     {/* ══ Queue section ══ */}
     <div className="mt-0">
       <div>
-          {/* Wave progress bar — mobile only, This Wave tab */}
-          {dashTab === 'wave' && currentWave > 0 && currentWaveProgress && (
-            <div className="lg:hidden bg-white rounded-xl px-4 py-3 mb-3" style={{ border: '1px solid #E0DDD6' }}>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-bold" style={{ color: '#0F172A' }}>Wave {currentWave} progress</span>
-                <span className="text-xs font-semibold" style={{ color: '#64748B' }}>{currentWaveProgress.served} / {currentWaveProgress.total} served</span>
-              </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#E2E8F0' }}>
-                <div className="h-full rounded-full transition-all duration-500" style={{ backgroundColor: '#1B6B3A', width: `${currentWaveProgress.total > 0 ? Math.round((currentWaveProgress.served / currentWaveProgress.total) * 100) : 0}%` }} />
-              </div>
-            </div>
-          )}
-
-          {/* Search + scan — mobile only (desktop search is in the action bar above) */}
-          <div className="lg:hidden flex gap-2 mb-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#64748B' }} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => { setSearchQuery(e.target.value); setTablePage(0) }}
-                placeholder={dashTab === 'served' ? 'Verify a name or state code…' : 'Search by name or state code…'}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-sm outline-none transition-all"
-                style={{ border: '1px solid #E0DDD6', color: '#0F172A' }}
-                onFocus={e => { e.target.style.borderColor = '#1B6B3A'; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.1)' }}
-                onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none' }}
-              />
-            </div>
-            <button
-              onClick={startQRScan}
-              title="Scan member pass"
-              className="flex-shrink-0 px-3.5 rounded-xl flex items-center justify-center active:opacity-70"
-              style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A', border: '1.5px solid rgba(27,107,58,0.2)' }}
-            >
-              <ScanLine className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Members count — mobile only */}
-          <div className="lg:hidden text-xs font-medium mb-2" style={{ color: '#64748B' }}>
+          {/* List group header — canonical wave numbering, never Wave 0 */}
+          <div className="lg:hidden text-xs font-medium mb-2" style={{ color: T.textSecondary }}>
             {dashTab === 'served'
               ? `${servedFilteredRows.length} cleared today`
               : dashTab === 'wave'
-                ? `${waveFilteredRows.length} in Wave ${currentWave}`
+                ? (currentWave > 0 ? `${waveFilteredRows.length} in Wave ${currentWave}` : 'No wave called yet')
                 : searchQuery
                   ? `${filteredAndSortedRows.length} of ${rows.length} members`
                   : `${rows.length} members total`}
@@ -1616,22 +947,22 @@ export default function Dashboard() {
 
           {/* ── Served tab: clean verification list ── */}
           {dashTab === 'served' && (
-            <div className="lg:hidden bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E0DDD6' }}>
+            <div className="lg:hidden bg-white rounded-xl overflow-hidden" style={{ border: `1px solid ${T.line}` }}>
               {servedFilteredRows.length === 0 ? (
-                <div className="py-12 text-center text-sm" style={{ color: '#64748B' }}>
+                <div className="py-12 text-center text-sm" style={{ color: T.textSecondary }}>
                   {searchQuery ? 'No matches found.' : 'No one has been served yet.'}
                 </div>
               ) : servedFilteredRows.map(r => (
-                <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0" style={{ borderColor: '#E2E8F0' }}>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#DCFCE7' }}>
-                    <Check className="w-3.5 h-3.5" style={{ color: '#166534' }} />
+                <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0" style={{ borderColor: T.line }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: T.servedTint }}>
+                    <Check className="w-3.5 h-3.5" style={{ color: T.served }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: '#0F172A' }}>{r.full_name}</p>
-                    <p className="text-xs font-mono" style={{ color: '#94A3B8' }}>{r.state_code}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: T.textPrimary }}>{r.full_name}</p>
+                    <p className="text-xs font-mono" style={{ color: T.textSecondary }}>{r.state_code}</p>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#F1F5F9', color: '#64748B' }}>W{r.batch_number}</span>
-                  <span className="text-xs flex-shrink-0" style={{ color: '#94A3B8' }}>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: T.sunken, color: T.textSecondary }}>W{r.batch_number}</span>
+                  <span className="text-xs flex-shrink-0" style={{ color: T.textSecondary }}>
                     {new Date(r.served_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -1642,25 +973,25 @@ export default function Dashboard() {
           {/* Top pagination — sticky on mobile so it stays reachable in a long queue */}
           {dashTab !== 'served' && filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
             <div
-              className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-xl bg-white sticky top-[96px] z-30 lg:static lg:top-auto shadow-sm"
-              style={{ border: '1px solid #E0DDD6' }}
+              className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-xl bg-white sticky top-[60px] z-30 lg:static lg:top-auto shadow-sm"
+              style={{ border: `1px solid ${T.line}` }}
             >
               <button
                 onClick={() => { setTablePage(p => Math.max(0, p - 1)); window.scrollTo({ top: 0 }) }}
                 disabled={tablePage === 0}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40 active:opacity-70"
-                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                style={{ backgroundColor: T.brandTint, color: T.brand }}
               >
                 <ChevronLeft className="w-4 h-4" /> Prev
               </button>
-              <span className="text-xs font-semibold" style={{ color: '#64748B' }}>
+              <span className="text-xs font-semibold" style={{ color: T.textSecondary }}>
                 Page {tablePage + 1} of {Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE)}
               </span>
               <button
                 onClick={() => { setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1)); window.scrollTo({ top: 0 }) }}
                 disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold disabled:opacity-40 active:opacity-70"
-                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                style={{ backgroundColor: T.brandTint, color: T.brand }}
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>
@@ -1668,15 +999,30 @@ export default function Dashboard() {
           )}
 
           {/* List — All + This Wave tabs on mobile, always on desktop */}
-          <div className={`bg-white rounded-xl overflow-hidden ${dashTab === 'served' ? 'hidden lg:block' : ''}`} style={{ border: '1px solid #E0DDD6' }}>
+          <div className={`bg-white rounded-xl overflow-hidden ${dashTab === 'served' ? 'hidden lg:block' : ''}`} style={{ border: `1px solid ${T.line}` }}>
             {activeRows.length === 0 && (
-              <div className="py-12 text-center text-sm" style={{ color: '#64748B' }}>
-                {searchQuery ? 'No members found.' : dashTab === 'wave' && currentWave <= 0 ? 'No wave called yet.' : 'No registrations yet.'}
+              <div className="py-12 text-center text-sm" style={{ color: T.textSecondary }}>
+                {searchQuery ? (
+                  'No members found. Check the spelling or scan their pass instead.'
+                ) : dashTab === 'wave' && currentWave <= 0 ? (
+                  'No wave called yet. The queue below fills as members check in.'
+                ) : (
+                  <span className="flex flex-col items-center gap-3">
+                    <span>No one checked in yet.</span>
+                    <button
+                      onClick={() => navigate('/manager')}
+                      className="min-h-[44px] px-5 rounded-xl text-sm font-bold transition-opacity active:opacity-80"
+                      style={{ backgroundColor: T.brandTint, color: T.brand }}
+                    >
+                      Open Check In
+                    </button>
+                  </span>
+                )}
               </div>
             )}
             {/* Desktop column headers */}
             {activeRows.length > 0 && (
-              <div className="hidden lg:flex items-center px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider" style={{ borderBottom: '1px solid #E2E8F0', color: '#94A3B8', backgroundColor: '#F8FAFC' }}>
+              <div className="hidden lg:flex items-center px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider" style={{ borderBottom: `1px solid ${T.line}`, color: T.textSecondary, backgroundColor: T.surface }}>
                 <div className="w-12 flex-shrink-0 text-center">Q#</div>
                 <div className="flex-1 min-w-0 pl-3">Full Name</div>
                 <div className="w-32 flex-shrink-0">State Code</div>
@@ -1688,18 +1034,18 @@ export default function Dashboard() {
                 {isSuperAdmin && <div className="w-16 flex-shrink-0 text-center">Edit</div>}
               </div>
             )}
-            <div className="divide-y" style={{ borderColor: '#E2E8F0' }}>
+            <div className="divide-y" style={{ borderColor: T.line }}>
               {activeRows.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE).map(r => (
                 <div key={r.id}>
                   {/* Row — mobile: tap to expand | desktop: full-width table row */}
                   <div
                     className="flex items-center px-4 py-3 transition-colors"
-                    style={{ backgroundColor: expandedRow === r.id ? '#F8FAFC' : 'white' }}
+                    style={{ backgroundColor: expandedRow === r.id ? T.surface : 'white' }}
                   >
                     {/* Q# badge */}
                     <div
                       className="w-12 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
-                      style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                      style={{ backgroundColor: T.brandTint, color: T.brand }}
                     >
                       {r.queue_number}
                     </div>
@@ -1711,25 +1057,25 @@ export default function Dashboard() {
                     >
                       <div
                         className={`text-sm font-semibold truncate ${r.voided ? 'line-through opacity-50' : ''}`}
-                        style={{ color: '#0F172A' }}
+                        style={{ color: T.textPrimary }}
                       >
                         {r.full_name}
                       </div>
                       {/* State code visible only on mobile (desktop has its own column) */}
-                      <div className="lg:hidden text-xs font-mono mt-0.5" style={{ color: '#64748B' }}>
+                      <div className="lg:hidden text-xs font-mono mt-0.5" style={{ color: T.textSecondary }}>
                         {r.state_code}
                       </div>
                     </div>
 
                     {/* State code column — desktop only */}
-                    <div className="hidden lg:block w-32 flex-shrink-0 text-xs font-mono" style={{ color: '#64748B' }}>
+                    <div className="hidden lg:block w-32 flex-shrink-0 text-xs font-mono" style={{ color: T.textSecondary }}>
                       {r.state_code}
                     </div>
 
                     {/* Wave badge */}
                     <span
                       className="lg:w-14 lg:text-center text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                      style={{ backgroundColor: T.brandTint, color: T.brand }}
                     >
                       W{r.batch_number}
                     </span>
@@ -1741,18 +1087,18 @@ export default function Dashboard() {
                         className="w-24 text-xs font-semibold px-2.5 py-1 rounded-full text-center"
                         style={{
                           backgroundColor: r.voided
-                            ? 'rgba(192,57,43,0.08)'
+                            ? T.dangerTint
                             : r.served_at
-                              ? 'rgba(27,107,58,0.08)'
-                              : 'rgba(245,155,10,0.10)',
-                          color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#D97706',
+                              ? T.brandTint
+                              : T.waitingTint,
+                          color: r.voided ? T.danger : r.served_at ? T.brand : T.waiting,
                         }}
                       >
                         {r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}
                       </span>
 
                       {/* Registered time */}
-                      <span className="w-20 text-xs text-right pr-2" style={{ color: '#94A3B8' }}>
+                      <span className="w-20 text-xs text-right pr-2" style={{ color: T.textSecondary }}>
                         {formatTime(r.registered_at)}
                       </span>
 
@@ -1764,7 +1110,7 @@ export default function Dashboard() {
                               onClick={() => toggleServed(r)}
                               disabled={rowBusy === r.id}
                               className="px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
-                              style={{ backgroundColor: r.served_at ? '#F59B0A' : '#1B6B3A' }}
+                              style={{ backgroundColor: r.served_at ? T.waiting : T.brand }}
                             >
                               {rowBusy === r.id ? '…' : r.served_at ? 'Undo' : 'Served'}
                             </button>
@@ -1774,7 +1120,7 @@ export default function Dashboard() {
                               onClick={() => setShowVoidConfirm(r)}
                               disabled={rowBusy === r.id}
                               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                              style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
+                              style={{ backgroundColor: T.dangerTint, color: T.danger }}
                             >
                               Void
                             </button>
@@ -1785,7 +1131,7 @@ export default function Dashboard() {
                                 onClick={() => { setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setEditQueueNumber(String(r.queue_number)); setError('') }}
                                 disabled={rowBusy === r.id}
                                 className="p-1.5 rounded-lg transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                style={{ backgroundColor: T.brandTint, color: T.brand }}
                                 title="Edit"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -1794,7 +1140,7 @@ export default function Dashboard() {
                                 onClick={() => { setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
                                 disabled={rowBusy === r.id}
                                 className="p-1.5 rounded-lg transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                style={{ backgroundColor: T.brandTint, color: T.brand }}
                                 title="Move wave"
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1810,7 +1156,7 @@ export default function Dashboard() {
                               onClick={() => toggleVoid(r)}
                               disabled={rowBusy === r.id}
                               className="px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                              style={{ backgroundColor: 'rgba(245,155,10,0.1)', color: '#F59B0A' }}
+                              style={{ backgroundColor: T.waitingTint, color: T.waiting }}
                             >
                               Restore
                             </button>
@@ -1825,7 +1171,7 @@ export default function Dashboard() {
                     <ChevronRight
                       className="lg:hidden w-4 h-4 flex-shrink-0 transition-transform duration-200"
                       style={{
-                        color: '#CBD5E1',
+                        color: T.line,
                         transform: expandedRow === r.id ? 'rotate(90deg)' : 'none',
                       }}
                     />
@@ -1833,17 +1179,17 @@ export default function Dashboard() {
 
                   {/* Expanded panel — mobile only */}
                   {expandedRow === r.id && (
-                    <div className="lg:hidden px-4 py-4" style={{ backgroundColor: '#F8FAFC', borderTop: '1px solid #E0DDD6' }}>
+                    <div className="lg:hidden px-4 py-4" style={{ backgroundColor: T.surface, borderTop: `1px solid ${T.line}` }}>
                       <div className="grid grid-cols-2 gap-3 text-xs mb-3">
                         <div>
-                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Status</div>
-                          <div className="font-bold" style={{ color: r.voided ? '#C0392B' : r.served_at ? '#1B6B3A' : '#64748B' }}>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: T.textSecondary }}>Status</div>
+                          <div className="font-bold" style={{ color: r.voided ? T.danger : r.served_at ? T.brand : T.textSecondary }}>
                             {r.voided ? 'Voided' : r.served_at ? 'Served' : 'Waiting'}
                           </div>
                         </div>
                         <div>
-                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>Registered</div>
-                          <div className="font-medium" style={{ color: '#0F172A' }}>{formatTime(r.registered_at)}</div>
+                          <div className="font-semibold uppercase tracking-wide mb-1" style={{ color: T.textSecondary }}>Registered</div>
+                          <div className="font-medium" style={{ color: T.textPrimary }}>{formatTime(r.registered_at)}</div>
                         </div>
                       </div>
                       {!r.voided && (
@@ -1852,7 +1198,7 @@ export default function Dashboard() {
                             onClick={e => { e.stopPropagation(); toggleServed(r) }}
                             disabled={rowBusy === r.id}
                             className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-opacity disabled:opacity-40"
-                            style={{ backgroundColor: r.served_at ? '#F59B0A' : '#1B6B3A' }}
+                            style={{ backgroundColor: r.served_at ? T.waiting : T.brand }}
                           >
                             {rowBusy === r.id ? '...' : r.served_at ? 'Undo served' : 'Mark served'}
                           </button>
@@ -1860,7 +1206,7 @@ export default function Dashboard() {
                             onClick={e => { e.stopPropagation(); setShowVoidConfirm(r) }}
                             disabled={rowBusy === r.id}
                             className="px-4 py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                            style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
+                            style={{ backgroundColor: T.dangerTint, color: T.danger }}
                           >
                             Void
                           </button>
@@ -1870,7 +1216,7 @@ export default function Dashboard() {
                                 onClick={e => { e.stopPropagation(); setShowEditModal(r); setEditName(r.full_name); setEditCode(r.state_code); setEditQueueNumber(String(r.queue_number)); setError('') }}
                                 disabled={rowBusy === r.id}
                                 className="px-3 py-2 rounded-lg transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                style={{ backgroundColor: T.brandTint, color: T.brand }}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
@@ -1878,7 +1224,7 @@ export default function Dashboard() {
                                 onClick={e => { e.stopPropagation(); setShowMoveWaveModal(r); setTargetWave(settings?.current_batch || r.batch_number) }}
                                 disabled={rowBusy === r.id}
                                 className="px-3 py-2 rounded-lg transition-opacity disabled:opacity-40"
-                                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: '#1B6B3A' }}
+                                style={{ backgroundColor: T.brandTint, color: T.brand }}
                               >
                                 <ChevronRight className="w-3.5 h-3.5" />
                               </button>
@@ -1891,7 +1237,7 @@ export default function Dashboard() {
                           onClick={e => { e.stopPropagation(); toggleVoid(r) }}
                           disabled={rowBusy === r.id}
                           className="w-full py-2 rounded-lg text-xs font-bold transition-opacity disabled:opacity-40"
-                          style={{ backgroundColor: 'rgba(245,155,10,0.1)', color: '#F59B0A' }}
+                          style={{ backgroundColor: T.waitingTint, color: T.waiting }}
                         >
                           Restore
                         </button>
@@ -1905,12 +1251,12 @@ export default function Dashboard() {
 
           {/* Pagination */}
           {filteredAndSortedRows.length > TABLE_PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: '#64748B' }}>
+            <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: T.textSecondary }}>
               <button
                 onClick={() => setTablePage(p => Math.max(0, p - 1))}
                 disabled={tablePage === 0}
                 className="px-3 py-1.5 rounded-lg bg-white disabled:opacity-40"
-                style={{ border: '1px solid #E0DDD6' }}
+                style={{ border: `1px solid ${T.line}` }}
               >
                 Previous
               </button>
@@ -1919,7 +1265,7 @@ export default function Dashboard() {
                 onClick={() => setTablePage(p => Math.min(Math.ceil(filteredAndSortedRows.length / TABLE_PAGE_SIZE) - 1, p + 1))}
                 disabled={(tablePage + 1) * TABLE_PAGE_SIZE >= filteredAndSortedRows.length}
                 className="px-3 py-1.5 rounded-lg bg-white disabled:opacity-40"
-                style={{ border: '1px solid #E0DDD6' }}
+                style={{ border: `1px solid ${T.line}` }}
               >
                 Next
               </button>
@@ -1930,7 +1276,7 @@ export default function Dashboard() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: '#0F172A' }}>
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: T.textPrimary }}>
           {toast}
         </div>
       )}
@@ -2007,51 +1353,13 @@ export default function Dashboard() {
       )}
 
       {showCallWaveConfirm && (
-        <Modal onClose={() => setShowCallWaveConfirm(false)}>
-          <h2 className="text-lg font-extrabold text-slate-950">Call Wave {nextBatchNumber}?</h2>
-          <p className="text-slate-800 text-sm mt-2">
-            This will notify {nextBatchCount} corps member{nextBatchCount !== 1 ? 's' : ''} in Wave {nextBatchNumber} that their wave is being served.
-          </p>
-          <div className="mt-5 flex gap-2 justify-end">
-            <button
-              onClick={() => setShowCallWaveConfirm(false)}
-              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => { setShowCallWaveConfirm(false); callNextBatch() }}
-              disabled={busy}
-              className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 disabled:bg-slate-300 text-white font-bold transition-colors"
-            >
-              Call wave
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {showEmptyBatchConfirm && (
-        <Modal onClose={() => setShowEmptyBatchConfirm(false)}>
-          <h2 className="text-lg font-extrabold text-slate-950">Empty wave</h2>
-          <p className="text-slate-800 text-sm mt-2">
-            Wave {nextBatchNumber} has no registrants. Skip to Wave {nextBatchNumber} anyway?
-          </p>
-          <div className="mt-5 flex gap-2 justify-end">
-            <button
-              onClick={() => setShowEmptyBatchConfirm(false)}
-              className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 active:bg-slate-400 font-semibold text-slate-900 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => { setShowEmptyBatchConfirm(false); callNextBatch() }}
-              disabled={busy}
-              className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:bg-slate-300 text-white font-bold transition-colors"
-            >
-              Skip anyway
-            </button>
-          </div>
-        </Modal>
+        <CallWaveSheet
+          wave={nextBatchNumber}
+          count={nextBatchCount}
+          busy={busy}
+          onCancel={() => setShowCallWaveConfirm(false)}
+          onConfirm={() => { setShowCallWaveConfirm(false); callNextBatch() }}
+        />
       )}
 
       {showVoidConfirm && (
@@ -2280,15 +1588,15 @@ export default function Dashboard() {
       {scannedMember && (
         <Modal onClose={() => setScannedMember(null)}>
           <div className="text-center">
-            <div className="text-xs uppercase tracking-wider font-bold" style={{ color: '#1B6B3A' }}>Check-in pass</div>
+            <div className="text-xs uppercase tracking-wider font-bold" style={{ color: T.brand }}>Check-in pass</div>
             <div className="mt-1 text-xl font-extrabold text-slate-950 break-words">{scannedMember.full_name}</div>
             <div className="text-sm font-mono text-slate-600">{scannedMember.state_code}</div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'rgba(27,107,58,0.06)' }}>
-              <div className="text-[10px] uppercase font-bold" style={{ color: '#1B6B3A' }}>Queue #</div>
-              <div className="text-2xl font-extrabold" style={{ color: '#0F172A' }}>{scannedMember.queue_number}</div>
+            <div className="rounded-xl p-3 text-center" style={{ backgroundColor: T.brandTint }}>
+              <div className="text-[10px] uppercase font-bold" style={{ color: T.brand }}>Queue #</div>
+              <div className="text-2xl font-extrabold" style={{ color: T.textPrimary }}>{scannedMember.queue_number}</div>
             </div>
             <div className="rounded-xl p-3 text-center bg-slate-100">
               <div className="text-[10px] uppercase font-bold text-slate-600">Wave</div>
@@ -2297,7 +1605,7 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-3 text-center text-sm font-semibold"
-            style={{ color: scannedMember.voided ? '#C0392B' : scannedMember.served_at ? '#1B6B3A' : '#D97706' }}>
+            style={{ color: scannedMember.voided ? T.danger : scannedMember.served_at ? T.brand : T.waiting }}>
             {scannedMember.voided ? 'This entry was voided' : scannedMember.served_at ? 'Already served' : 'Waiting to be served'}
           </div>
 
@@ -2312,7 +1620,7 @@ export default function Dashboard() {
               <button
                 onClick={async () => { await toggleServed(scannedMember); setScannedMember(null) }}
                 className="flex-1 py-2.5 rounded-xl font-bold text-white transition-opacity active:opacity-80"
-                style={{ backgroundColor: scannedMember.served_at ? '#F59B0A' : '#1B6B3A' }}
+                style={{ backgroundColor: scannedMember.served_at ? T.waiting : T.brand }}
               >
                 {scannedMember.served_at ? 'Undo served' : 'Mark served'}
               </button>
@@ -2380,10 +1688,10 @@ function LiveStatCard({ label, value, fullWidth }) {
   return (
     <div
       className={`bg-white rounded-xl px-4 py-4 ${fullWidth ? 'col-span-2' : ''}`}
-      style={{ border: '1px solid #E0DDD6' }}
+      style={{ border: `1px solid ${T.line}` }}
     >
-      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#64748B' }}>{label}</div>
-      <div className="text-4xl font-extrabold leading-none" style={{ color: '#0F172A' }}>{value}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: T.textSecondary }}>{label}</div>
+      <div className="text-4xl font-extrabold leading-none" style={{ color: T.textPrimary }}>{value}</div>
     </div>
   )
 }
@@ -2401,6 +1709,68 @@ function Stat({ label, value, subtitle, accent }) {
       }`}>{label}</div>
       <div className="text-2xl font-extrabold leading-tight mt-0.5">{value}</div>
       {subtitle && <div className={`text-xs font-semibold mt-0.5 ${accent ? 'text-amber-700' : 'text-slate-500'}`}>{subtitle}</div>}
+    </div>
+  )
+}
+
+// ── Call Wave confirm sheet ───────────────────────────────
+// Bottom sheet on mobile, centred card on desktop. Traps focus while
+// open and restores it to the trigger on close.
+function CallWaveSheet({ wave, count, busy, onCancel, onConfirm }) {
+  const confirmRef = useRef(null)
+  const cancelRef = useRef(null)
+  const restoreRef = useRef(null)
+
+  useEffect(() => {
+    restoreRef.current = document.activeElement
+    confirmRef.current?.focus()
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel() }
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        const next = document.activeElement === confirmRef.current ? cancelRef.current : confirmRef.current
+        next?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      restoreRef.current?.focus?.()
+    }
+  }, [onCancel])
+
+  return (
+    <div className="fixed inset-0 z-[100] lg:flex lg:items-center lg:justify-center lg:p-6" role="dialog" aria-modal="true" aria-label={`Call Wave ${wave}`}>
+      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={onCancel} />
+      <div
+        className="absolute bottom-0 left-0 right-0 rounded-t-2xl px-5 pt-5 lg:relative lg:bottom-auto lg:rounded-2xl lg:max-w-sm lg:w-full lg:shadow-2xl lg:pb-6"
+        style={{ backgroundColor: T.raised, paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
+      >
+        <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: T.line }} />
+        <h2 className="text-lg font-extrabold" style={{ color: T.textPrimary }}>Call Wave {wave}?</h2>
+        <p className="text-sm mt-1" style={{ color: T.textSecondary }}>
+          {count} {count === 1 ? 'person' : 'people'} will be notified.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <button
+            ref={cancelRef}
+            onClick={onCancel}
+            className="flex-1 min-h-[48px] rounded-xl text-sm font-semibold transition-opacity active:opacity-70"
+            style={{ border: `1px solid ${T.line}`, color: T.textPrimary }}
+          >
+            Cancel
+          </button>
+          <button
+            ref={confirmRef}
+            onClick={onConfirm}
+            disabled={busy}
+            className="flex-1 min-h-[48px] rounded-xl text-sm font-bold transition-opacity active:opacity-80 disabled:opacity-50"
+            style={{ backgroundColor: T.brand, color: T.onBrand }}
+          >
+            {busy ? 'Calling…' : `Call Wave ${wave}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

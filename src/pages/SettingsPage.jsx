@@ -8,6 +8,7 @@ import {
 import { QRCodeCanvas } from 'qrcode.react'
 import { supabase } from '../lib/supabase.js'
 import { generateExcelReport, generatePdfReport } from '../lib/reports.js'
+import SuperAdminPanel from '../components/SuperAdminPanel.jsx'
 
 const G           = '#1B6B3A'
 const MUTED       = '#64748B'
@@ -451,6 +452,9 @@ export default function SettingsPage() {
               destructive
             />
           </Card>
+
+          {/* Super admin tools (relocated from the dashboard); hidden for regular execs */}
+          <SuperAdminPanel />
 
           <p className="text-center text-xs pb-2" style={{ color: MUTED }}>
             Eti-Osa 3 Special CDS · NYSC Lagos State

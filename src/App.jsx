@@ -248,49 +248,59 @@ export default function App() {
             )}
           </aside>
 
-          {/* ── MOBILE: Fixed top header (52px) ── */}
+          {/* ── MOBILE: single slim header (Band 1) ──
+              Group name + live status left; role chip + avatar right.
+              Neutral surface: solid brand green is reserved for the
+              primary action button. Identity appears exactly once. */}
           <header
-            className="lg:hidden fixed left-0 right-0 z-50 flex items-center px-4 gap-3"
-            style={{ backgroundColor: G, height: '52px', top: 0, paddingTop: 'env(safe-area-inset-top)' }}
+            className="lg:hidden fixed left-0 right-0 z-50 flex items-center px-4 gap-2"
+            style={{
+              backgroundColor: 'var(--surface-raised)',
+              height: '56px',
+              top: 0,
+              paddingTop: 'env(safe-area-inset-top)',
+              borderBottom: '1px solid var(--line)',
+            }}
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
-                <ShieldMark className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-white text-sm tracking-tight">CDS Manager</span>
-            </div>
-            {user && (
-              <button
-                onClick={() => setShowSheet(true)}
-                aria-label="Account menu"
-                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-opacity active:opacity-70"
-                style={{ backgroundColor: GOLD, color: '#1A1A1A' }}
-              >
-                {initials(user)}
-              </button>
-            )}
-          </header>
-
-          {/* ── MOBILE: Sticky session bar ── */}
-          <div
-            className="lg:hidden fixed left-0 right-0 z-40 bg-white"
-            style={{ top: '52px', borderBottom: '1px solid #E0DDD6' }}
-          >
-            <div className="flex items-center justify-between gap-3 px-4 h-11">
-              <span className="text-sm font-semibold truncate" style={{ color: '#1A1A1A' }}>
+              <span className="font-bold text-sm tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>
                 Eti-Osa 3 Special CDS
               </span>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span
+                className="flex items-center gap-1 flex-shrink-0 text-xs font-semibold"
+                style={{ color: sessionOpen ? 'var(--status-served)' : 'var(--text-secondary)' }}
+              >
                 <span className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: sessionOpen ? G : '#8C8880' }} />
-                <span className="text-xs font-medium"
-                  style={{ color: sessionOpen ? G : '#8C8880' }}>
-                  {sessionOpen ? 'Open' : 'Closed'}
-                </span>
-              </div>
+                  style={{ backgroundColor: sessionOpen ? 'var(--status-served)' : 'var(--line)' }} />
+                {sessionOpen ? 'Open' : 'Closed'}
+              </span>
             </div>
-          </div>
+            {user && (
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span
+                  className="text-[10px] font-bold px-2 py-1 rounded-full truncate max-w-[110px]"
+                  style={{
+                    backgroundColor: roleLabel === 'Super Admin' ? 'var(--accent-gold-tint)' : 'var(--brand-green-tint)',
+                    color: roleLabel === 'Super Admin' ? 'var(--accent-gold)' : 'var(--brand-green)',
+                  }}
+                >
+                  {roleLabel === 'Super Admin' ? '⚡ Super Admin' : roleLabel}
+                </span>
+                <button
+                  onClick={() => setShowSheet(true)}
+                  aria-label="Account menu"
+                  className="w-11 h-11 -mr-1.5 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
+                >
+                  <span
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
+                    style={{ backgroundColor: 'var(--accent-gold)', color: 'var(--surface-raised)' }}
+                  >
+                    {initials(user)}
+                  </span>
+                </button>
+              </div>
+            )}
+          </header>
         </>
       )}
 
@@ -318,7 +328,7 @@ export default function App() {
 
       {/* ── Page content ── */}
       <main
-        className={`flex-1 transition-all duration-200 ${isExecPage ? `pt-[96px] pb-[72px] lg:pt-0 lg:pb-0 ${sidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-[64px]'}` : ''}`}
+        className={`flex-1 transition-all duration-200 ${isExecPage ? `pt-[56px] pb-[72px] lg:pt-0 lg:pb-0 ${sidebarOpen ? 'lg:pl-[240px]' : 'lg:pl-[64px]'}` : ''}`}
       >
         <Outlet />
       </main>

@@ -2,6 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Semantic design tokens ─────────────────────────────────────────
+   Components consume these (via Tailwind theme aliases or src/lib/tokens.js).
+   Solid brand-green fill is reserved for the single primary action per screen. */
+:root {
+  --brand-green:         #1B6B3A;
+  --brand-green-tint:    rgba(27, 107, 58, 0.10);
+  --accent-gold:         #A67C2E;
+  --accent-gold-tint:    rgba(166, 124, 46, 0.15);
+  --status-waiting:      #92600A; /* 5.2:1 on --surface */
+  --status-waiting-tint: rgba(146, 96, 10, 0.10);
+  --status-served:       #1B6B3A; /* 6.3:1 on its tint */
+  --status-served-tint:  rgba(27, 107, 58, 0.08);
+  --status-danger:       #C0392B; /* 5.3:1 on white */
+  --status-danger-tint:  rgba(192, 57, 43, 0.08);
+  --surface:             #F8FAFC;
+  --surface-raised:      #FFFFFF;
+  --surface-sunken:      #F1F5F9;
+  --text-primary:        #0F172A;
+  --text-secondary:      #64748B; /* 4.75:1 on white */
+  --text-on-brand:       #FFFFFF;
+  --line:                #E2E8F0;
+  --focus-ring:          rgba(27, 107, 58, 0.35);
+}
+
+/* Visible focus for keyboard users on all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ── Auth form input — shared across Login, Signup, ForgotPassword ── */
 @layer components {
   .auth-input {
