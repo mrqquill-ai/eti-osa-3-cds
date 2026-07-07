@@ -700,7 +700,7 @@ export default function Dashboard() {
           osc.start()
           setTimeout(() => { osc.stop(); ctx.close() }, 300)
         } catch {}
-        flash(`${'\uD83D\uDD14'} ${current} registrations reached!`)
+        flash(`${current} registrations reached!`)
       }
     }
     prevRegisteredRef.current = current
@@ -1276,7 +1276,7 @@ export default function Dashboard() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: T.textPrimary }}>
+        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: T.textPrimary }}>
           {toast}
         </div>
       )}
@@ -1389,7 +1389,7 @@ export default function Dashboard() {
 
       {showDaySummary && (
         <Modal onClose={() => setShowDaySummary(null)}>
-          <h2 className="text-lg font-extrabold text-slate-950">{'\u2705'} Day reset complete</h2>
+          <h2 className="text-lg font-extrabold text-slate-950 flex items-center gap-2"><Check className="w-5 h-5 flex-shrink-0" style={{ color: T.brand }} aria-hidden="true" />Day reset complete</h2>
           <p className="text-slate-700 text-sm mt-2">All entries have been archived. Here is today's summary:</p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="bg-slate-50 rounded-lg p-3 text-center">

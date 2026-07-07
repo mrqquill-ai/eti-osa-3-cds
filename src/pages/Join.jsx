@@ -1,6 +1,20 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Ban, MapPin, AlertTriangle, CheckCircle } from 'lucide-react'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId, friendlyNetworkError } from '../lib/supabase.js'
+
+/* Icon badge for full-screen states (replaces emoji glyphs) */
+function StateIcon({ icon: Icon, bg, color, pulse = false }) {
+  return (
+    <div
+      className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ${pulse ? 'animate-pulse' : ''}`}
+      style={{ backgroundColor: bg }}
+      aria-hidden="true"
+    >
+      <Icon className="w-7 h-7" style={{ color }} />
+    </div>
+  )
+}
 
 // Default venue coords — overridden by session_settings from DB
 const DEFAULT_VENUE_LAT = 6.4360344
@@ -303,12 +317,12 @@ export default function Join() {
     const nextDay = getNextCDSDay()
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
+        <StateIcon icon={Ban} bg="rgba(192,57,43,0.10)" color="#C0392B" />
         <h1 className="text-2xl font-extrabold text-amber-900">Registration closed</h1>
         <p className="text-amber-800 mt-2">Registration is closed for the day.</p>
         {nextDay && (
           <p className="text-amber-800 mt-2 text-sm">
-            Next: <span className="font-bold">{nextDay.type}</span> {'\u2014'} {nextDay.date.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            Next: <span className="font-bold">{nextDay.type}</span> {'\u00B7'} {nextDay.date.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         )}
         {/* Already registered? lookup */}
@@ -353,7 +367,7 @@ export default function Join() {
   if (geoState === 'checking') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3 animate-pulse">{'\uD83D\uDCCD'}</div>
+        <StateIcon icon={MapPin} bg="rgba(27,107,58,0.10)" color="#1B6B3A" pulse />
         <h1 className="text-xl font-extrabold text-slate-900">Checking your location...</h1>
         <p className="text-slate-700 mt-2 text-sm">
           Please allow location access when prompted.
@@ -365,7 +379,7 @@ export default function Join() {
   if (geoState === 'denied') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\uD83D\uDEAB'}</div>
+        <StateIcon icon={Ban} bg="rgba(192,57,43,0.10)" color="#C0392B" />
         <h1 className="text-xl font-extrabold text-red-900">Location access denied</h1>
         <p className="text-slate-700 mt-2 text-sm">
           You need to allow location access to join the queue.
@@ -388,7 +402,7 @@ export default function Join() {
   if (geoState === 'too_far') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\uD83D\uDCCD'}</div>
+        <StateIcon icon={MapPin} bg="rgba(192,57,43,0.10)" color="#C0392B" />
         <h1 className="text-xl font-extrabold text-red-900">You are not at the venue</h1>
         <p className="text-slate-700 mt-2 text-sm">
           You must be physically present at the CDS venue to join the queue.
@@ -415,7 +429,7 @@ export default function Join() {
   if (geoState === 'error') {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\u26A0\uFE0F'}</div>
+        <StateIcon icon={AlertTriangle} bg="rgba(146,96,10,0.12)" color="#92600A" />
         <h1 className="text-xl font-extrabold text-slate-900">Location unavailable</h1>
         <p className="text-slate-700 mt-2 text-sm">
           We could not determine your location. Try these steps:
@@ -495,7 +509,7 @@ export default function Join() {
     <div className="max-w-md mx-auto p-4 sm:p-6">
       <div className="text-center mt-4">
         <div className="inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">
-          <span>{'\u2705'}</span> You are at the venue
+          <CheckCircle className="w-3.5 h-3.5" aria-hidden="true" /> You are at the venue
         </div>
       </div>
 

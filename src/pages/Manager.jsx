@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Users, Clock, Activity, Layers , Link2, Copy, Download, Share2, ScanLine } from 'lucide-react'
+import { Users, Clock, Activity, Layers , Link2, Copy, Download, Share2, ScanLine, AlertTriangle } from 'lucide-react'
 import jsQR from 'jsqr'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError, getDeviceId } from '../lib/supabase.js'
 
@@ -388,14 +388,14 @@ export default function Manager() {
 
           {recentRegs.length > 1 && recentRegs[1].batch_number !== result.batch_number && (
             <div className="mt-3 bg-amber-100 border border-amber-400 text-amber-900 rounded-lg px-3 py-1.5 text-xs font-bold text-center">
-              ⚠️ New wave started! This person is in Wave {result.batch_number}.
+              <AlertTriangle className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" aria-hidden="true" />New wave started! This person is in Wave {result.batch_number}.
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 mt-5">
             <div className="bg-emerald-50 rounded-xl p-4 text-center">
               <div className="text-xs uppercase text-emerald-700 font-bold">Queue #</div>
-              <div className="text-4xl font-extrabold text-emerald-900 leading-none mt-1">{result.queue_number}</div>
+              <div className="text-4xl font-extrabold text-emerald-900 leading-none mt-1 tabular-nums">{result.queue_number}</div>
             </div>
             <div className="bg-slate-100 rounded-xl p-4 text-center">
               <div className="text-xs uppercase text-slate-700 font-bold">Wave</div>

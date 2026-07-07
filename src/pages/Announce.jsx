@@ -13,9 +13,9 @@ const MAX_CHARS = 300
 
 const TEMPLATES = [
   { label: '☕ Break time',          text: 'We are on a short break. Please stay in your seats. We will resume shortly.' },
-  { label: '📋 Report to desk',      text: 'All corps members in the current wave, please report to the desk for documentation.' },
-  { label: '🚫 Registration closed', text: 'Registration is now closed. If you have not checked in yet, please see an executive.' },
-  { label: '✅ Clearance complete',   text: 'Today\'s CDS clearance is complete. Thank you for your cooperation. Have a great day!' },
+  { label: 'Report to desk',      text: 'All corps members in the current wave, please report to the desk for documentation.' },
+  { label: 'Registration closed', text: 'Registration is now closed. If you have not checked in yet, please see an executive.' },
+  { label: 'Clearance complete',   text: 'Today\'s CDS clearance is complete. Thank you for your cooperation. Have a great day!' },
 ]
 
 function fmtTime(iso) {
@@ -339,6 +339,8 @@ export default function AnnouncePage() {
       {/* ── Toast ── */}
       {toast && (
         <div
+          role="status"
+          aria-live="polite"
           className="fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
           style={{ backgroundColor: INK }}
         >

@@ -465,7 +465,7 @@ export default function SettingsPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
+        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
           style={{ backgroundColor: INK }}>
           {toast}
         </div>
@@ -668,7 +668,7 @@ export default function SettingsPage() {
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-70 disabled:opacity-40"
                 style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G }}
               >
-                📍 Use my current location
+                <MapPin className="w-4 h-4 inline-block mr-1 -mt-0.5" aria-hidden="true" />Use my current location
               </button>
             )}
 

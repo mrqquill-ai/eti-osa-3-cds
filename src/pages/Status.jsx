@@ -1,8 +1,21 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-// lucide icons removed — using emoji for status states
+import { HelpCircle, AlertTriangle, CheckCircle, Bell, Clock, Megaphone } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
+
+/* Consistent icon badge for status states (replaces emoji glyphs) */
+function StateIcon({ icon: Icon, bg, color, pulse = false }) {
+  return (
+    <div
+      className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ${pulse ? 'animate-pulse' : ''}`}
+      style={{ backgroundColor: bg }}
+      aria-hidden="true"
+    >
+      <Icon className="w-7 h-7" style={{ color }} />
+    </div>
+  )
+}
 
 export default function Status() {
   const { stateCode } = useParams()
@@ -143,7 +156,7 @@ export default function Status() {
   if (notFound || !reg) {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\u2753'}</div>
+        <StateIcon icon={HelpCircle} bg="rgba(100,116,139,0.12)" color="#64748B" />
         <h1 className="text-2xl font-extrabold text-slate-900">No active registration</h1>
         <p className="text-slate-700 mt-2">
           We could not find <span className="font-mono font-bold">{code}</span> in today's queue.
@@ -162,7 +175,7 @@ export default function Status() {
   if (reg.voided) {
     return (
       <CenteredCard>
-        <div className="text-5xl mb-3">{'\u26A0\uFE0F'}</div>
+        <StateIcon icon={AlertTriangle} bg="rgba(146,96,10,0.12)" color="#92600A" />
         <h1 className="text-2xl font-extrabold text-slate-900">Entry voided</h1>
         <p className="text-slate-700 mt-2">Please return to the registration desk.</p>
       </CenteredCard>
@@ -182,7 +195,7 @@ export default function Status() {
   if (isCleared) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: 'rgba(27,107,58,0.08)', border: '2px solid #1B6B3A' }}>
-        <div className="text-5xl mb-1">✅</div>
+        <StateIcon icon={CheckCircle} bg="rgba(27,107,58,0.12)" color="#1B6B3A" />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Cleared!</div>
         <div className="text-sm mt-1" style={{ color: '#1B6B3A' }}>You are done. Have a great day.</div>
       </div>
@@ -190,7 +203,7 @@ export default function Status() {
   } else if (isBeingServed) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '2px solid #F59B0A' }}>
-        <div className="text-5xl mb-1">🔔</div>
+        <StateIcon icon={Bell} bg="rgba(146,96,10,0.15)" color="#92600A" />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Your wave is now being served</div>
         <div className="text-base mt-1" style={{ color: '#92640A' }}>Head to clearance immediately.</div>
       </div>
@@ -198,13 +211,13 @@ export default function Status() {
   } else if (currentBatch > 0 && batchesAhead > 0) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F8FAFC', border: '2px solid #E2E8F0' }}>
-        <div className="text-5xl mb-1">{'\u23f3'}</div>
+        <StateIcon icon={Clock} bg="rgba(100,116,139,0.10)" color="#64748B" />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
         <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
         </div>
         <div className="text-sm mt-1" style={{ color: '#64748B' }}>
-          Wave {currentBatch} is being served now{' \u2014 '}{batchesAhead === 1 ? 'you are next!' : `${batchesAhead} waves before yours`}
+          Wave {currentBatch} is being served now. {batchesAhead === 1 ? 'You are next!' : `${batchesAhead} waves before yours.`}
         </div>
         {estimatedMins !== null ? (
           <div className="text-xs mt-1" style={{ color: '#94A3B8' }}>
@@ -220,7 +233,7 @@ export default function Status() {
   } else {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F8FAFC', border: '2px solid #E2E8F0' }}>
-        <div className="text-5xl mb-1">{'\u23f3'}</div>
+        <StateIcon icon={Clock} bg="rgba(100,116,139,0.10)" color="#64748B" />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
         <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
@@ -240,7 +253,7 @@ export default function Status() {
       {/* Announcement banner */}
       {settings?.announcement && (
         <div className="bg-amber-100 border-2 border-amber-400 text-amber-900 rounded-xl p-3 mt-4 text-sm font-semibold text-center">
-          {'\u{1F4E2}'} {settings.announcement}
+          <Megaphone className="w-4 h-4 inline-block mr-1.5 -mt-0.5" aria-hidden="true" />{settings.announcement}
         </div>
       )}
 
@@ -255,13 +268,13 @@ export default function Status() {
         <div className="grid grid-cols-2 gap-3 mt-5">
           <div className="bg-emerald-50 rounded-xl p-4 text-center">
             <div className="text-xs uppercase text-emerald-700 font-bold">Queue #</div>
-            <div className="text-5xl font-extrabold text-emerald-900 leading-none mt-1">
+            <div className="text-5xl font-extrabold text-emerald-900 leading-none mt-1 tabular-nums">
               {reg.queue_number}
             </div>
           </div>
           <div className="bg-slate-100 rounded-xl p-4 text-center">
             <div className="text-xs uppercase text-slate-700 font-bold">Your wave</div>
-            <div className="text-5xl font-extrabold text-slate-900 leading-none mt-1">
+            <div className="text-5xl font-extrabold text-slate-900 leading-none mt-1 tabular-nums">
               {reg.batch_number}
             </div>
           </div>

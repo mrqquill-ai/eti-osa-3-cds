@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, ShieldCheck } from 'lucide-react'
+import { ChevronRight, ShieldCheck, Users, Megaphone, ClipboardList, Key, Archive, AlertTriangle, MapPin, Hash } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { T } from '../lib/tokens.js'
 
@@ -171,13 +171,13 @@ export default function SuperAdminPanel() {
 
   const pendingCount = execList.filter(p => p.status === 'pending').length
   const tabMeta = {
-    approvals:  { icon: '👤', label: 'Approvals',  desc: pendingCount > 0 ? `${pendingCount} pending` : 'Manage exec accounts' },
-    announce:   { icon: '📢', label: 'Announce',   desc: 'Broadcast to all members' },
-    log:        { icon: '📋', label: 'Activity',   desc: 'Recent admin actions' },
-    sessions:   { icon: '🔑', label: 'Sessions',   desc: 'Active exec logins' },
-    archives:   { icon: '🗄', label: 'Archives',   desc: 'Past session records' },
-    duplicates: { icon: '⚠️', label: 'Duplicates', desc: 'Flag suspicious entries' },
-    venue:      { icon: '📍', label: 'Venue',      desc: 'Location and geofence' },
+    approvals:  { icon: Users,         label: 'Approvals',  desc: pendingCount > 0 ? `${pendingCount} pending` : 'Manage exec accounts' },
+    announce:   { icon: Megaphone,     label: 'Announce',   desc: 'Broadcast to all members' },
+    log:        { icon: ClipboardList, label: 'Activity',   desc: 'Recent admin actions' },
+    sessions:   { icon: Key,           label: 'Sessions',   desc: 'Active exec logins' },
+    archives:   { icon: Archive,       label: 'Archives',   desc: 'Past session records' },
+    duplicates: { icon: AlertTriangle, label: 'Duplicates', desc: 'Flag suspicious entries' },
+    venue:      { icon: MapPin,        label: 'Venue',      desc: 'Location and geofence' },
   }
 
   const statusColors = (status) => ({
@@ -228,7 +228,11 @@ export default function SuperAdminPanel() {
               <button key={key} onClick={() => setTab(key)}
                 className="flex flex-col items-start gap-1 p-3 rounded-xl text-left transition-colors active:opacity-70 min-h-[44px]"
                 style={{ backgroundColor: T.surface, border: `1px solid ${T.line}` }}>
-                <span className="text-xl">{tabMeta[key].icon}</span>
+                {(() => { const Icon = tabMeta[key].icon; return (
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: T.brandTint }} aria-hidden="true">
+                    <Icon className="w-4 h-4" style={{ color: T.brand }} />
+                  </span>
+                ) })()}
                 <span className="text-sm font-bold" style={{ color: T.textPrimary }}>{tabMeta[key].label}</span>
                 <span className="text-[11px] leading-tight" style={{ color: T.textSecondary }}>{tabMeta[key].desc}</span>
               </button>
@@ -241,7 +245,7 @@ export default function SuperAdminPanel() {
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors active:opacity-70 disabled:opacity-40 min-h-[44px]"
             style={{ backgroundColor: T.waitingTint, border: `1px solid ${T.waiting}` }}
           >
-            <span className="text-lg">🔢</span>
+            <Hash className="w-[18px] h-[18px] flex-shrink-0" style={{ color: T.waiting }} aria-hidden="true" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold" style={{ color: T.waiting }}>Renumber Queue</div>
               <div className="text-[11px]" style={{ color: T.waiting }}>Close gaps and reassign numbers from #1 in order</div>
@@ -253,7 +257,11 @@ export default function SuperAdminPanel() {
               <button key={key} onClick={() => setTab(key)}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:opacity-70 min-h-[44px]"
                 style={{ borderBottom: i < arr.length - 1 ? `1px solid ${T.line}` : 'none' }}>
-                <span className="text-lg w-6 flex-shrink-0">{tabMeta[key].icon}</span>
+                {(() => { const Icon = tabMeta[key].icon; return (
+                  <span className="w-6 flex-shrink-0 flex items-center justify-center" aria-hidden="true">
+                    <Icon className="w-[18px] h-[18px]" style={{ color: T.textSecondary }} />
+                  </span>
+                ) })()}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold" style={{ color: T.textPrimary }}>{tabMeta[key].label}</div>
                   <div className="text-[11px] mt-0.5" style={{ color: T.textSecondary }}>{tabMeta[key].desc}</div>
@@ -458,7 +466,7 @@ export default function SuperAdminPanel() {
                 {duplicates.map((d, i) => (
                   <div key={i} className="px-4 py-3 flex items-start gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: T.dangerTint }}>
-                      <span className="text-sm">⚠️</span>
+                      <AlertTriangle className="w-4 h-4" style={{ color: T.danger }} aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold" style={{ color: T.textPrimary }}>{d.full_name}</div>
@@ -558,7 +566,7 @@ export default function SuperAdminPanel() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50" style={{ backgroundColor: T.textPrimary, color: T.raised }}>
+        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50" style={{ backgroundColor: T.textPrimary, color: T.raised }}>
           {toast}
         </div>
       )}

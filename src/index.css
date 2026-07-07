@@ -41,6 +41,23 @@
   }
 }
 
+/* ── Interaction hardening ────────────────────────────────────────
+   Pointer cursor on enabled controls; touch-action removes the
+   double-tap zoom delay on interactive elements. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button, a, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Keep text size stable in landscape; inputs at 16px on touch devices
+   so iOS Safari does not zoom-jump into focused fields. */
+html { -webkit-text-size-adjust: 100%; }
+@media (max-width: 1023px) {
+  input, select, textarea { font-size: 16px; }
+}
+
 /* ── Auth form input — shared across Login, Signup, ForgotPassword ── */
 @layer components {
   .auth-input {

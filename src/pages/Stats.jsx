@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Zap, Clock, TrendingUp, Users } from 'lucide-react'
+import { Zap, Clock, TrendingUp, Users, BarChart2, Award } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 const G     = '#1B6B3A'
@@ -114,7 +114,7 @@ export default function StatsPage() {
         <div className="text-center py-16 text-sm" style={{ color: MUTED }}>Loading stats…</div>
       ) : total === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center" style={{ border: `1px solid ${LINE}` }}>
-          <div className="text-5xl mb-4">📊</div>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "rgba(100,116,139,0.10)" }} aria-hidden="true"><BarChart2 className="w-7 h-7" style={{ color: "#64748B" }} /></div>
           <p className="font-semibold text-base" style={{ color: INK }}>No registrations yet</p>
           <p className="text-sm mt-1.5" style={{ color: MUTED }}>
             Stats will appear once corps members start checking in.
@@ -168,7 +168,7 @@ export default function StatsPage() {
                 </div>
                 {pct === 100 ? (
                   <p className="text-xs font-bold mt-3 text-center" style={{ color: AMBER }}>
-                    🎉 All corps members cleared!
+                    <Award className="w-4 h-4 inline-block mr-1 -mt-0.5" aria-hidden="true" />All corps members cleared!
                   </p>
                 ) : (
                   <div className="flex items-center justify-between mt-3 text-xs font-medium" style={{ color: MUTED }}>
