@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Ban, MapPin, AlertTriangle, CheckCircle } from 'lucide-react'
+import { T } from '../lib/tokens.js'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, getDeviceId, friendlyNetworkError } from '../lib/supabase.js'
 
 /* Icon badge for full-screen states (replaces emoji glyphs) */
@@ -317,7 +318,7 @@ export default function Join() {
     const nextDay = getNextCDSDay()
     return (
       <CenteredCard>
-        <StateIcon icon={Ban} bg="rgba(192,57,43,0.10)" color="#C0392B" />
+        <StateIcon icon={Ban} bg={T.dangerTint} color={T.danger} />
         <h1 className="text-2xl font-extrabold text-amber-900">Registration closed</h1>
         <p className="text-amber-800 mt-2">Registration is closed for the day.</p>
         {nextDay && (
@@ -367,7 +368,7 @@ export default function Join() {
   if (geoState === 'checking') {
     return (
       <CenteredCard>
-        <StateIcon icon={MapPin} bg="rgba(27,107,58,0.10)" color="#1B6B3A" pulse />
+        <StateIcon icon={MapPin} bg={T.brandTint} color={T.brand} pulse />
         <h1 className="text-xl font-extrabold text-slate-900">Checking your location...</h1>
         <p className="text-slate-700 mt-2 text-sm">
           Please allow location access when prompted.
@@ -379,7 +380,7 @@ export default function Join() {
   if (geoState === 'denied') {
     return (
       <CenteredCard>
-        <StateIcon icon={Ban} bg="rgba(192,57,43,0.10)" color="#C0392B" />
+        <StateIcon icon={Ban} bg={T.dangerTint} color={T.danger} />
         <h1 className="text-xl font-extrabold text-red-900">Location access denied</h1>
         <p className="text-slate-700 mt-2 text-sm">
           You need to allow location access to join the queue.
@@ -402,7 +403,7 @@ export default function Join() {
   if (geoState === 'too_far') {
     return (
       <CenteredCard>
-        <StateIcon icon={MapPin} bg="rgba(192,57,43,0.10)" color="#C0392B" />
+        <StateIcon icon={MapPin} bg={T.dangerTint} color={T.danger} />
         <h1 className="text-xl font-extrabold text-red-900">You are not at the venue</h1>
         <p className="text-slate-700 mt-2 text-sm">
           You must be physically present at the CDS venue to join the queue.
@@ -429,7 +430,7 @@ export default function Join() {
   if (geoState === 'error') {
     return (
       <CenteredCard>
-        <StateIcon icon={AlertTriangle} bg="rgba(146,96,10,0.12)" color="#92600A" />
+        <StateIcon icon={AlertTriangle} bg={T.waitingTint} color={T.waiting} />
         <h1 className="text-xl font-extrabold text-slate-900">Location unavailable</h1>
         <p className="text-slate-700 mt-2 text-sm">
           We could not determine your location. Try these steps:

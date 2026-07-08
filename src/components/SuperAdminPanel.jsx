@@ -526,8 +526,8 @@ export default function SuperAdminPanel() {
       {/* Reject / revoke sheet */}
       {showRejectSheet && (
         <div className="fixed inset-0 z-[100]">
-          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRejectSheet(null)} />
-          <div className="absolute bottom-0 left-0 right-0 rounded-t-2xl px-5 pt-5" style={{ backgroundColor: T.raised, paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+          <div className="absolute inset-0 imp-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowRejectSheet(null)} />
+          <div className="imp-sheet-in absolute bottom-0 left-0 right-0 rounded-t-2xl px-5 pt-5" style={{ backgroundColor: T.raised, paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ backgroundColor: T.line }} />
             <h3 className="text-base font-bold mb-1" style={{ color: T.textPrimary }}>
               {execList.find(p => p.id === showRejectSheet)?.status === 'approved' ? 'Revoke access' : 'Reject access request'}
@@ -566,7 +566,7 @@ export default function SuperAdminPanel() {
 
       {/* Toast */}
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50" style={{ backgroundColor: T.textPrimary, color: T.raised }}>
+        <div role="status" aria-live="polite" className="imp-toast-in fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50" style={{ backgroundColor: T.textPrimary, color: T.raised }}>
           {toast}
         </div>
       )}

@@ -5,10 +5,12 @@ import { Users, Clock, Activity, Layers , Link2, Copy, Download, Share2, ScanLin
 import jsQR from 'jsqr'
 import { supabase, STATE_CODE_REGEX, normalizeStateCode, friendlyNetworkError, getDeviceId } from '../lib/supabase.js'
 
-const G    = '#1B6B3A'
-const MUTED = '#64748B'
-const INK   = '#0F172A'
-const LINE  = '#E2E8F0'
+import { T } from '../lib/tokens.js'
+
+const G     = T.brand
+const MUTED = T.textSecondary
+const INK   = T.textPrimary
+const LINE  = T.line
 
 export default function Manager() {
   const navigate = useNavigate()
@@ -59,7 +61,7 @@ export default function Manager() {
   }
 
   function shareWhatsApp() {
-    const text = encodeURIComponent(`Eti-Osa 3 Special CDS — Join the queue from your phone:\n${joinUrl}`)
+    const text = encodeURIComponent(`Eti-Osa 3 Special CDS. Join the queue from your phone:\n${joinUrl}`)
     window.open(`https://wa.me/?text=${text}`, '_blank')
   }
 
@@ -223,7 +225,7 @@ export default function Manager() {
   function handleStateCodeBlur() {
     const code = normalizeStateCode(stateCode)
     if (code && !STATE_CODE_REGEX.test(code)) {
-      setStateCodeError('State code format: XX/00X/0000 — e.g. LA/24A/1234 or LA/25B/11622.')
+      setStateCodeError('State code format: XX/00X/0000, e.g. LA/24A/1234 or LA/25B/11622.')
     } else {
       setStateCodeError('')
     }
@@ -285,7 +287,7 @@ export default function Manager() {
     const name = fullName.trim()
     if (!name) return setError('Enter the corps member’s full name.')
     if (!STATE_CODE_REGEX.test(code)) {
-      setStateCodeError('State code format: XX/00X/0000 — e.g. LA/24A/1234 or LA/25B/11622.')
+      setStateCodeError('State code format: XX/00X/0000, e.g. LA/24A/1234 or LA/25B/11622.')
       return
     }
     setBusy(true); retryCount.current = 0
@@ -333,16 +335,16 @@ export default function Manager() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
         {/* Icon */}
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-          style={{ backgroundColor: 'rgba(27,107,58,0.08)' }}>
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="#1B6B3A" strokeWidth="1.8">
+          style={{ backgroundColor: T.brandTint }}>
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="var(--brand-green)" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
         </div>
 
         {/* Text */}
-        <h1 className="text-xl font-extrabold" style={{ color: '#0F172A' }}>Registration is closed</h1>
-        <p className="text-sm mt-2 max-w-xs leading-relaxed" style={{ color: '#64748B' }}>
+        <h1 className="text-xl font-extrabold" style={{ color: T.textPrimary }}>Registration is closed</h1>
+        <p className="text-sm mt-2 max-w-xs leading-relaxed" style={{ color: T.textSecondary }}>
           Corps members cannot join the queue right now. Open registration from Settings when you're ready to begin.
         </p>
 
@@ -363,12 +365,12 @@ export default function Manager() {
           }}
           disabled={busy}
           className="mt-6 px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity active:opacity-80 disabled:opacity-50"
-          style={{ backgroundColor: '#1B6B3A' }}
+          style={{ backgroundColor: T.brand }}
         >
           {busy ? 'Opening…' : 'Open registration now'}
         </button>
         {error && (
-          <p className="mt-3 text-sm font-semibold" style={{ color: '#C0392B' }}>{error}</p>
+          <p className="mt-3 text-sm font-semibold" style={{ color: T.danger }}>{error}</p>
         )}
       </div>
     )
@@ -432,7 +434,7 @@ export default function Manager() {
 
           {/* Auto-advance countdown bar */}
           {autoAdvance !== null && (
-            <div className="mt-4 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#E2E8F0' }}>
+            <div className="mt-4 h-1 rounded-full overflow-hidden" style={{ backgroundColor: T.line }}>
               <div
                 className="h-full rounded-full transition-all duration-1000"
                 style={{ width: `${(autoAdvance / 8) * 100}%`, backgroundColor: G }}
@@ -457,9 +459,9 @@ export default function Manager() {
   /* ─── Status badge helper ─── */
   function StatusBadge({ status }) {
     const map = {
-      waiting: { label: 'Waiting', bg: '#EFF6FF', color: '#1D4ED8' },
-      called:  { label: 'Called',  bg: '#FEF9C3', color: '#854D0E' },
-      served:  { label: 'Served',  bg: '#F0FDF4', color: '#166534' },
+      waiting: { label: 'Waiting', bg: T.waitingTint, color: T.waiting },
+      called:  { label: 'Called',  bg: T.waitingTint, color: T.waiting },
+      served:  { label: 'Served',  bg: T.servedTint, color: T.served },
     }
     const s = map[status] || { label: status, bg: LINE, color: MUTED }
     return (
@@ -485,9 +487,9 @@ export default function Manager() {
       <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4 mb-6">
         {[
           { icon: Users,    label: 'Registered',  value: liveStats.total,   color: G },
-          { icon: Clock,    label: 'Waiting',      value: liveStats.waiting, color: '#1D4ED8' },
-          { icon: Activity, label: 'Served',        value: liveStats.served,  color: '#166534' },
-          { icon: Layers,   label: 'Now Serving',  value: currentBatch > 0 ? `Wave ${currentBatch}` : '—', color: '#92400E' },
+          { icon: Clock,    label: 'Waiting',      value: liveStats.waiting, color: T.waiting },
+          { icon: Activity, label: 'Served',        value: liveStats.served,  color: T.served },
+          { icon: Layers,   label: 'Now Serving',  value: currentBatch > 0 ? `Wave ${currentBatch}` : 'None yet', color: T.waiting },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3" style={{ border: `1px solid ${LINE}` }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -519,10 +521,10 @@ export default function Manager() {
                   onChange={(e) => setFullName(e.target.value)}
                   maxLength={200} autoComplete="off" autoCapitalize="words"
                   className="mt-1.5 w-full rounded-xl px-4 py-3 text-base outline-none transition-all"
-                  style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: '#F8FAFC' }}
+                  style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: T.surface }}
                   placeholder="e.g. Adaeze Okonkwo"
                   disabled={busy}
-                  onFocus={e => { e.target.style.borderColor = G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
+                  onFocus={e => { e.target.style.borderColor = G; e.target.style.boxShadow = `0 0 0 3px ${T.focusRing}` }}
                   onBlur={e =>  { e.target.style.borderColor = LINE; e.target.style.boxShadow = 'none' }}
                 />
               </label>
@@ -534,12 +536,12 @@ export default function Manager() {
                     type="text" value={stateCode}
                     onChange={(e) => { setStateCode(e.target.value.toUpperCase()); setStateCodeError('') }}
                     onBlur={handleStateCodeBlur}
-                    onFocus={(e) => { setStateCodeError(''); e.target.style.borderColor = stateCodeError ? '#EF4444' : G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
+                    onFocus={(e) => { setStateCodeError(''); e.target.style.borderColor = stateCodeError ? T.danger : G; e.target.style.boxShadow = `0 0 0 3px ${T.focusRing}` }}
                     maxLength={20} autoComplete="off" autoCapitalize="characters"
                     className="flex-1 rounded-xl px-4 py-3 text-base font-mono tracking-wider outline-none transition-all"
                     style={{
-                      border: `1.5px solid ${stateCodeError ? '#EF4444' : LINE}`,
-                      color: INK, backgroundColor: '#F8FAFC',
+                      border: `1.5px solid ${stateCodeError ? T.danger : LINE}`,
+                      color: INK, backgroundColor: T.surface,
                     }}
                     placeholder="LA/24A/1234"
                     disabled={busy}
@@ -550,7 +552,7 @@ export default function Manager() {
                     disabled={busy}
                     title="Scan QR code"
                     className="px-3 rounded-xl transition-colors active:opacity-70 disabled:opacity-40 flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1.5px solid rgba(27,107,58,0.2)` }}
+                    style={{ backgroundColor: T.brandTint, color: G, border: `1.5px solid ${T.brandTint}` }}
                   >
                     <ScanLine className="w-5 h-5" />
                   </button>
@@ -589,7 +591,7 @@ export default function Manager() {
                 onChange={(e) => { setLookupCode(e.target.value.toUpperCase()); setLookupError(''); setLookupResult(null) }}
                 maxLength={20} autoComplete="off" autoCapitalize="characters"
                 className="flex-1 rounded-xl px-4 py-2.5 text-sm font-mono tracking-wider outline-none transition-all"
-                style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: '#F8FAFC' }}
+                style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: T.surface }}
                 placeholder="Enter state code"
                 onFocus={e => { e.target.style.borderColor = G }}
                 onBlur={e =>  { e.target.style.borderColor = LINE }}
@@ -603,7 +605,7 @@ export default function Manager() {
             {lookupError && <p className="text-red-600 text-xs font-semibold mt-2">{lookupError}</p>}
             {lookupResult && (
               <div className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-                style={{ backgroundColor: 'rgba(27,107,58,0.06)', border: `1px solid rgba(27,107,58,0.15)` }}>
+                style={{ backgroundColor: T.brandTint, border: `1px solid ${T.brandTint}` }}>
                 <div>
                   <p className="text-sm font-bold" style={{ color: INK }}>{lookupResult.full_name}</p>
                   <p className="text-xs font-mono mt-0.5" style={{ color: MUTED }}>
@@ -636,7 +638,7 @@ export default function Manager() {
                   value={joinUrl}
                   size={160}
                   bgColor="#ffffff"
-                  fgColor={INK}
+                  fgColor="#0F172A"
                   level="M"
                   includeMargin={false}
                 />
@@ -651,13 +653,13 @@ export default function Manager() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
                 </svg>
-                Show QR — Corps Member Scan
+                Show QR for Corps Member Scan
               </button>
 
               <button
                 onClick={downloadQR}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors active:opacity-70"
-                style={{ backgroundColor: '#F1F5F9', color: MUTED }}
+                style={{ backgroundColor: T.sunken, color: MUTED }}
               >
                 <Download className="w-3.5 h-3.5" />
                 Download QR
@@ -668,7 +670,7 @@ export default function Manager() {
             {isSuperAdmin && (
             <>
             {/* URL row */}
-            <div className="flex items-center gap-2 p-3 rounded-xl mt-4" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
+            <div className="flex items-center gap-2 p-3 rounded-xl mt-4" style={{ backgroundColor: T.surface, border: `1px solid ${LINE}` }}>
               <Link2 className="w-4 h-4 flex-shrink-0" style={{ color: MUTED }} />
               <span className="flex-1 text-xs font-mono truncate" style={{ color: INK }}>
                 {joinUrl}
@@ -680,7 +682,7 @@ export default function Manager() {
               <button
                 onClick={copyLink}
                 className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-semibold transition-colors active:opacity-70"
-                style={{ backgroundColor: linkCopied ? 'rgba(27,107,58,0.08)' : '#F1F5F9', color: linkCopied ? G : MUTED, border: `1px solid ${LINE}` }}
+                style={{ backgroundColor: linkCopied ? T.brandTint : T.sunken, color: linkCopied ? G : MUTED, border: `1px solid ${LINE}` }}
               >
                 <Copy className="w-4 h-4" />
                 {linkCopied ? 'Copied!' : 'Copy'}
@@ -701,7 +703,7 @@ export default function Manager() {
               <button
                 onClick={shareNative}
                 className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-semibold transition-colors active:opacity-70"
-                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1px solid rgba(27,107,58,0.15)` }}
+                style={{ backgroundColor: T.brandTint, color: G, border: `1px solid ${T.brandTint}` }}
               >
                 <Share2 className="w-4 h-4" />
                 Share
@@ -758,12 +760,12 @@ export default function Manager() {
                     <div key={r.id}
                       className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-300"
                       style={{
-                        backgroundColor: isNew ? 'rgba(27,107,58,0.07)' : '#F8FAFC',
-                        border: `1px solid ${isNew ? 'rgba(27,107,58,0.2)' : LINE}`,
+                        backgroundColor: isNew ? T.brandTint : T.surface,
+                        border: `1px solid ${isNew ? '${T.brandTint}' : LINE}`,
                       }}>
                       {/* Queue # badge */}
                       <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-sm"
-                        style={{ backgroundColor: isNew ? G : '#E2E8F0', color: isNew ? 'white' : MUTED }}>
+                        style={{ backgroundColor: isNew ? G : T.line, color: isNew ? 'white' : MUTED }}>
                         #{r.queue_number}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -790,7 +792,7 @@ export default function Manager() {
     {showJoinQR && (
       <div
         className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-        style={{ backgroundColor: '#1B6B3A' }}
+        style={{ backgroundColor: T.brand }}
         onClick={() => setShowJoinQR(false)}
       >
         <div className="text-white text-center mb-6 px-4">
@@ -845,7 +847,7 @@ export default function Manager() {
           <button
             onClick={stopQRScan}
             className="w-full mt-3 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-            style={{ backgroundColor: '#F1F5F9', color: INK }}
+            style={{ backgroundColor: T.sunken, color: INK }}
           >
             Cancel
           </button>

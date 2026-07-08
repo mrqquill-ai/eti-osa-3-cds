@@ -10,7 +10,7 @@ const LINE  = '#E0DDD6'
 const CREAM = '#F9F6F0'
 
 function formatDateTime(ts) {
-  if (!ts) return '—'
+  if (!ts) return 'Not yet'
   return new Date(ts).toLocaleString('en-NG', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: 'numeric', minute: '2-digit', hour12: true,
@@ -240,7 +240,7 @@ export default function Members() {
                               className="inline-block text-xs font-bold px-2 py-0.5 rounded-full"
                               style={{ backgroundColor: 'rgba(192,57,43,0.08)', color: '#C0392B' }}
                             >
-                              Voided — contact coordinator
+                              Voided. Contact coordinator
                             </span>
                           </div>
                         )}

@@ -465,7 +465,7 @@ export default function Dashboard() {
         p_state_code: code, p_full_name: name
       })
       if (e) throw e
-      flash(`Added ${name} — Q#${data.queue_number}, Wave ${data.batch_number}`)
+      flash(`Added ${name}: Q#${data.queue_number}, Wave ${data.batch_number}`)
       setShowAddRegModal(false); setAddRegName(''); setAddRegCode('')
     } catch (e) {
       const msg = e?.message || ''
@@ -716,7 +716,7 @@ export default function Dashboard() {
         .eq('id', 1)
       if (e) throw e
       setSettings(prev => prev ? { ...prev, geofencing_enabled: newVal } : prev)
-      flash(newVal ? 'Geofencing enabled.' : 'Geofencing disabled — corps members can join from any location.')
+      flash(newVal ? 'Geofencing enabled.' : 'Geofencing disabled. Corps members can join from any location.')
     } catch (e) { showError(e) } finally { setBusy(false) }
   }
 
@@ -1050,10 +1050,19 @@ export default function Dashboard() {
                       {r.queue_number}
                     </div>
 
-                    {/* Name — tap area on mobile */}
+                    {/* Name — tap area on mobile, keyboard-operable */}
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expandedRow === r.id}
                       className="flex-1 min-w-0 pl-3 cursor-pointer lg:cursor-default"
                       onClick={() => setExpandedRow(expandedRow === r.id ? null : r.id)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setExpandedRow(expandedRow === r.id ? null : r.id)
+                        }
+                      }}
                     >
                       <div
                         className={`text-sm font-semibold truncate ${r.voided ? 'line-through opacity-50' : ''}`}
@@ -1276,7 +1285,7 @@ export default function Dashboard() {
 
       {/* ── Toast ── */}
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: T.textPrimary }}>
+        <div role="status" aria-live="polite" className="imp-toast-in fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 text-white" style={{ backgroundColor: T.textPrimary }}>
           {toast}
         </div>
       )}
@@ -1741,9 +1750,9 @@ function CallWaveSheet({ wave, count, busy, onCancel, onConfirm }) {
 
   return (
     <div className="fixed inset-0 z-[100] lg:flex lg:items-center lg:justify-center lg:p-6" role="dialog" aria-modal="true" aria-label={`Call Wave ${wave}`}>
-      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={onCancel} />
+      <div className="absolute inset-0 imp-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={onCancel} />
       <div
-        className="absolute bottom-0 left-0 right-0 rounded-t-2xl px-5 pt-5 lg:relative lg:bottom-auto lg:rounded-2xl lg:max-w-sm lg:w-full lg:shadow-2xl lg:pb-6"
+        className="imp-sheet-in absolute bottom-0 left-0 right-0 rounded-t-2xl px-5 pt-5 lg:relative lg:bottom-auto lg:rounded-2xl lg:max-w-sm lg:w-full lg:shadow-2xl lg:pb-6"
         style={{ backgroundColor: T.raised, paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-4 lg:hidden" style={{ backgroundColor: T.line }} />
@@ -1778,9 +1787,9 @@ function CallWaveSheet({ wave, count, busy, onCancel, onConfirm }) {
 // ── Modal shell ───────────────────────────────────────────
 function Modal({ children, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 imp-fade-in" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6"
+        className="imp-pop-in bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

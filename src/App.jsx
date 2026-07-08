@@ -373,7 +373,7 @@ export default function App() {
             onClick={() => setShowSheet(false)}
           />
           <div
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl px-6 pt-6"
+            className="imp-sheet-in absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl px-6 pt-6"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
           >
             <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-5" />
@@ -409,12 +409,12 @@ export default function App() {
       )}
       {/* ── Sign out confirmation dialog ── */}
       {showSignOutDlg && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center px-5"
+        <div className="fixed inset-0 z-[200] flex items-center justify-center px-5 imp-fade-in"
           style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
           onClick={() => setShowSignOutDlg(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            className="imp-pop-in bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-11 h-11 rounded-full flex items-center justify-center mb-4"

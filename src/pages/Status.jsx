@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { HelpCircle, AlertTriangle, CheckCircle, Bell, Clock, Megaphone } from 'lucide-react'
+import { T } from '../lib/tokens.js'
 import { supabase } from '../lib/supabase.js'
 
 /* Consistent icon badge for status states (replaces emoji glyphs) */
@@ -150,13 +151,20 @@ export default function Status() {
   }, [servedCount, firstServedAt])
 
   if (loading) {
-    return <CenteredCard><p className="text-slate-700">Loading...</p></CenteredCard>
+    return (
+      <CenteredCard>
+        <svg className="w-8 h-8 animate-spin text-emerald-700 mx-auto" fill="none" viewBox="0 0 24 24" aria-label="Loading">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+      </CenteredCard>
+    )
   }
 
   if (notFound || !reg) {
     return (
       <CenteredCard>
-        <StateIcon icon={HelpCircle} bg="rgba(100,116,139,0.12)" color="#64748B" />
+        <StateIcon icon={HelpCircle} bg={T.sunken} color={T.textSecondary} />
         <h1 className="text-2xl font-extrabold text-slate-900">No active registration</h1>
         <p className="text-slate-700 mt-2">
           We could not find <span className="font-mono font-bold">{code}</span> in today's queue.
@@ -175,7 +183,7 @@ export default function Status() {
   if (reg.voided) {
     return (
       <CenteredCard>
-        <StateIcon icon={AlertTriangle} bg="rgba(146,96,10,0.12)" color="#92600A" />
+        <StateIcon icon={AlertTriangle} bg={T.waitingTint} color={T.waiting} />
         <h1 className="text-2xl font-extrabold text-slate-900">Entry voided</h1>
         <p className="text-slate-700 mt-2">Please return to the registration desk.</p>
       </CenteredCard>
@@ -195,7 +203,7 @@ export default function Status() {
   if (isCleared) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: 'rgba(27,107,58,0.08)', border: '2px solid #1B6B3A' }}>
-        <StateIcon icon={CheckCircle} bg="rgba(27,107,58,0.12)" color="#1B6B3A" />
+        <StateIcon icon={CheckCircle} bg={T.brandTint} color={T.brand} />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Cleared!</div>
         <div className="text-sm mt-1" style={{ color: '#1B6B3A' }}>You are done. Have a great day.</div>
       </div>
@@ -203,7 +211,7 @@ export default function Status() {
   } else if (isBeingServed) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center animate-pulse" style={{ backgroundColor: 'rgba(245,155,10,0.1)', border: '2px solid #F59B0A' }}>
-        <StateIcon icon={Bell} bg="rgba(146,96,10,0.15)" color="#92600A" />
+        <StateIcon icon={Bell} bg={T.waitingTint} color={T.waiting} />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Your wave is now being served</div>
         <div className="text-base mt-1" style={{ color: '#92640A' }}>Head to clearance immediately.</div>
       </div>
@@ -211,7 +219,7 @@ export default function Status() {
   } else if (currentBatch > 0 && batchesAhead > 0) {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F8FAFC', border: '2px solid #E2E8F0' }}>
-        <StateIcon icon={Clock} bg="rgba(100,116,139,0.10)" color="#64748B" />
+        <StateIcon icon={Clock} bg={T.sunken} color={T.textSecondary} />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
         <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>
@@ -233,7 +241,7 @@ export default function Status() {
   } else {
     statusBlock = (
       <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: '#F8FAFC', border: '2px solid #E2E8F0' }}>
-        <StateIcon icon={Clock} bg="rgba(100,116,139,0.10)" color="#64748B" />
+        <StateIcon icon={Clock} bg={T.sunken} color={T.textSecondary} />
         <div className="text-2xl font-extrabold mt-2" style={{ color: '#1A1A1A' }}>Waiting</div>
         <div className="text-base mt-1" style={{ color: '#1A1A1A' }}>
           You are in <span className="font-extrabold">Wave {reg.batch_number}</span>

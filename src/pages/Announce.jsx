@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { Megaphone, X, Clock, RotateCcw, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
-const G     = '#1B6B3A'
-const MUTED = '#64748B'
-const INK   = '#0F172A'
-const LINE  = '#E2E8F0'
-const AMBER = '#F59B0A'
+import { T } from '../lib/tokens.js'
+
+const G     = T.brand
+const MUTED = T.textSecondary
+const INK   = T.textPrimary
+const LINE  = T.line
+const AMBER = T.waiting
 
 const MAX_CHARS = 300
 
@@ -146,7 +148,7 @@ export default function AnnouncePage() {
                 key={t.label}
                 onClick={() => setDraft(t.text.slice(0, MAX_CHARS))}
                 className="text-xs font-medium px-3 py-1.5 rounded-full transition-colors active:opacity-70 hover:bg-slate-200"
-                style={{ backgroundColor: '#F1F5F9', color: INK }}
+                style={{ backgroundColor: T.sunken, color: INK }}
               >
                 {t.label}
               </button>
@@ -161,11 +163,11 @@ export default function AnnouncePage() {
               rows={6}
               placeholder="Type your announcement here…"
               className="w-full rounded-xl px-4 py-3 text-sm resize-none outline-none transition-all"
-              style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: '#F8FAFC' }}
-              onFocus={e => { e.target.style.borderColor = G; e.target.style.boxShadow = '0 0 0 3px rgba(27,107,58,0.10)' }}
+              style={{ border: `1.5px solid ${LINE}`, color: INK, backgroundColor: T.surface }}
+              onFocus={e => { e.target.style.borderColor = G; e.target.style.boxShadow = `0 0 0 3px ${T.focusRing}` }}
               onBlur={e =>  { e.target.style.borderColor = LINE; e.target.style.boxShadow = 'none' }}
             />
-            <p className="text-right text-xs mt-1" style={{ color: remaining < 30 ? '#EF4444' : MUTED }}>
+            <p className="text-right text-xs mt-1" style={{ color: remaining < 30 ? T.danger : MUTED }}>
               {remaining} chars left
             </p>
           </div>
@@ -184,7 +186,7 @@ export default function AnnouncePage() {
               <button
                 onClick={() => setDraft('')}
                 className="px-4 py-3 rounded-xl text-sm font-semibold transition-colors active:opacity-70"
-                style={{ backgroundColor: '#F1F5F9', color: MUTED }}
+                style={{ backgroundColor: T.sunken, color: MUTED }}
               >
                 Clear
               </button>
@@ -195,13 +197,13 @@ export default function AnnouncePage() {
         {/* ── COL 2: Live preview ── */}
         <div className="bg-white rounded-2xl p-5 space-y-4" style={{ border: `1px solid ${LINE}` }}>
           <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>
-            Live — what corps members see
+            Live preview: what corps members see
           </h2>
 
           {/* Current live announcement */}
           {current ? (
             <div className="rounded-xl p-3"
-              style={{ backgroundColor: 'rgba(245,155,10,0.08)', border: `1px solid rgba(245,155,10,0.3)` }}>
+              style={{ backgroundColor: T.waitingTint, border: `1px solid ${T.waiting}` }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5">
                   <Megaphone className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: AMBER }} />
@@ -222,7 +224,7 @@ export default function AnnouncePage() {
             </div>
           ) : (
             <div className="rounded-xl p-5 text-center"
-              style={{ backgroundColor: '#F8FAFC', border: `1px dashed ${LINE}` }}>
+              style={{ backgroundColor: T.surface, border: `1px dashed ${LINE}` }}>
               <Megaphone className="w-6 h-6 mx-auto mb-2" style={{ color: LINE }} />
               <p className="text-sm font-medium" style={{ color: MUTED }}>No active announcement</p>
               <p className="text-xs mt-1" style={{ color: MUTED }}>Corps members see a blank banner</p>
@@ -234,7 +236,7 @@ export default function AnnouncePage() {
             <div>
               <p className="text-xs font-semibold mb-2" style={{ color: MUTED }}>Draft preview:</p>
               <div className="rounded-xl p-3"
-                style={{ backgroundColor: 'rgba(245,155,10,0.04)', border: `1px dashed rgba(245,155,10,0.4)` }}>
+                style={{ backgroundColor: T.waitingTint, border: `1px dashed ${T.waiting}` }}>
                 <div className="flex items-start gap-2.5">
                   <Megaphone className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: AMBER }} />
                   <p className="text-sm leading-snug" style={{ color: INK }}>{draft}</p>
@@ -254,9 +256,9 @@ export default function AnnouncePage() {
               {/* fake banner */}
               {(current || draft.trim()) ? (
                 <div className="px-3 py-2 flex items-center gap-2"
-                  style={{ backgroundColor: 'rgba(245,155,10,0.12)', borderBottom: `1px solid rgba(245,155,10,0.2)` }}>
+                  style={{ backgroundColor: T.waitingTint, borderBottom: `1px solid ${T.waiting}` }}>
                   <Megaphone className="w-3 h-3 flex-shrink-0" style={{ color: AMBER }} />
-                  <p className="text-xs leading-snug line-clamp-2" style={{ color: '#92400E' }}>
+                  <p className="text-xs leading-snug line-clamp-2" style={{ color: T.waiting }}>
                     {draft.trim() || current}
                   </p>
                 </div>
@@ -309,7 +311,7 @@ export default function AnnouncePage() {
             <div className="space-y-2 overflow-y-auto" style={{ maxHeight: '420px' }}>
               {history.map((h) => (
                 <div key={h.id} className="rounded-xl p-3 group relative"
-                  style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
+                  style={{ backgroundColor: T.surface, border: `1px solid ${LINE}` }}>
                   <div className="flex items-start gap-2 pr-8">
                     <Megaphone className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: AMBER }} />
                     <div className="flex-1 min-w-0">
@@ -325,7 +327,7 @@ export default function AnnouncePage() {
                     onClick={() => setDraft(h.text)}
                     title="Re-use this announcement"
                     className="absolute top-2.5 right-2.5 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity active:opacity-70"
-                    style={{ color: G, backgroundColor: 'rgba(27,107,58,0.08)' }}
+                    style={{ color: G, backgroundColor: T.brandTint }}
                   >
                     <RotateCcw className="w-3 h-3" />
                   </button>
@@ -341,7 +343,7 @@ export default function AnnouncePage() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
+          className="imp-toast-in fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
           style={{ backgroundColor: INK }}
         >
           {toast}

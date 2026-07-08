@@ -10,11 +10,13 @@ import { supabase } from '../lib/supabase.js'
 import { generateExcelReport, generatePdfReport } from '../lib/reports.js'
 import SuperAdminPanel from '../components/SuperAdminPanel.jsx'
 
-const G           = '#1B6B3A'
-const MUTED       = '#64748B'
-const INK         = '#0F172A'
-const LINE        = '#E2E8F0'
-const DESTRUCTIVE = '#C0392B'
+import { T } from '../lib/tokens.js'
+
+const G           = T.brand
+const MUTED       = T.textSecondary
+const INK         = T.textPrimary
+const LINE        = T.line
+const DESTRUCTIVE = T.danger
 
 /* ─────────────────────────────────────────────────────────────────────
    ConfirmSheet — bottom sheet on mobile, centred modal on desktop
@@ -23,13 +25,13 @@ function ConfirmSheet({ title, body, confirmLabel, destructive = false, onCancel
   return (
     <div className="fixed inset-0 z-[100] lg:flex lg:items-center lg:justify-center lg:p-6">
       {/* Scrim */}
-      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={onCancel} />
+      <div className="absolute inset-0 imp-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={onCancel} />
 
       {/* Panel — slides up from bottom on mobile, centred card on desktop */}
       <div
         className={[
           /* shared */
-          'bg-white px-6 pt-5',
+          'bg-white px-6 pt-5 imp-sheet-in',
           /* mobile: anchored to bottom, sits above scrim via DOM order */
           'absolute bottom-0 left-0 right-0 rounded-t-2xl',
           /* desktop: centred card, z-10 so it sits above the absolute scrim */
@@ -58,7 +60,7 @@ function ConfirmSheet({ title, body, confirmLabel, destructive = false, onCancel
             disabled={busy}
             className="flex-1 py-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
             style={{
-              backgroundColor: destructive ? 'rgba(192,57,43,0.08)' : G,
+              backgroundColor: destructive ? T.dangerTint : G,
               color: destructive ? DESTRUCTIVE : 'white',
               border: destructive ? `1px solid ${DESTRUCTIVE}` : 'none',
             }}
@@ -315,7 +317,7 @@ export default function SettingsPage() {
       {/* Error banner */}
       {error && !sheet && (
         <div className="mb-4 rounded-xl p-3 flex items-start gap-3"
-          style={{ backgroundColor: 'rgba(192,57,43,0.07)', border: `1px solid ${DESTRUCTIVE}` }}>
+          style={{ backgroundColor: T.dangerTint, border: `1px solid ${DESTRUCTIVE}` }}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: DESTRUCTIVE }} />
           <span className="flex-1 text-sm font-medium" style={{ color: DESTRUCTIVE }}>{error}</span>
           <button onClick={() => setError('')}><X className="w-4 h-4" style={{ color: DESTRUCTIVE }} /></button>
@@ -349,7 +351,7 @@ export default function SettingsPage() {
                 disabled={busy || !settings}
                 className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 style={{
-                  backgroundColor: isOpen ? 'rgba(192,57,43,0.08)' : 'rgba(27,107,58,0.1)',
+                  backgroundColor: isOpen ? T.dangerTint : T.brandTint,
                   color: isOpen ? DESTRUCTIVE : G,
                 }}
               >
@@ -376,7 +378,7 @@ export default function SettingsPage() {
               onClick={() => { setNewBatchSize(settings?.batch_size ?? 30); setSheet('waveSize'); setError('') }}
               disabled={!settings}
               rightEl={
-                <span className="text-xs font-bold px-2 py-1 rounded-md" style={{ backgroundColor: '#F1F5F9', color: MUTED }}>
+                <span className="text-xs font-bold px-2 py-1 rounded-md" style={{ backgroundColor: T.sunken, color: MUTED }}>
                   {settings?.batch_size ?? '—'}
                 </span>
               }
@@ -405,7 +407,7 @@ export default function SettingsPage() {
                 onClick={toggleGeofencing}
                 disabled={busy || !settings}
                 className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 flex-shrink-0"
-                style={{ backgroundColor: geoOn ? G : '#CBD5E1' }}
+                style={{ backgroundColor: geoOn ? G : T.line }}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${geoOn ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
@@ -465,7 +467,7 @@ export default function SettingsPage() {
 
       {/* Toast */}
       {toast && (
-        <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
+        <div role="status" aria-live="polite" className="imp-toast-in fixed bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-semibold z-50 whitespace-nowrap"
           style={{ backgroundColor: INK }}>
           {toast}
         </div>
@@ -489,9 +491,9 @@ export default function SettingsPage() {
 
       {sheet === 'report' && (
         <div className="fixed inset-0 z-[100] lg:flex lg:items-center lg:justify-center lg:p-6">
-          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={closeSheet} />
+          <div className="absolute inset-0 imp-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={closeSheet} />
           <div
-            className="bg-white px-6 pt-5 absolute bottom-0 left-0 right-0 rounded-t-2xl lg:relative lg:z-10 lg:bottom-auto lg:rounded-2xl lg:max-w-md lg:w-full lg:shadow-2xl lg:pt-7 lg:pb-7"
+            className="imp-sheet-in bg-white px-6 pt-5 absolute bottom-0 left-0 right-0 rounded-t-2xl lg:relative lg:z-10 lg:bottom-auto lg:rounded-2xl lg:max-w-md lg:w-full lg:shadow-2xl lg:pt-7 lg:pb-7"
             style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
           >
             <div className="lg:hidden w-10 h-1 rounded-full bg-slate-200 mx-auto mb-5" />
@@ -529,7 +531,7 @@ export default function SettingsPage() {
                 onClick={() => handleReport('pdf')}
                 disabled={!!reportBusy}
                 className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-opacity active:opacity-80 disabled:opacity-50"
-                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G, border: `1.5px solid rgba(27,107,58,0.2)` }}
+                style={{ backgroundColor: T.brandTint, color: G, border: `1.5px solid ${T.brandTint}` }}
               >
                 <FileText className="w-4 h-4" />
                 {reportBusy === 'pdf' ? 'Preparing…' : 'PDF'}
@@ -646,7 +648,7 @@ export default function SettingsPage() {
               <button
                 onClick={() => setGeoEnabled(v => !v)}
                 className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                style={{ backgroundColor: geoEnabled ? G : '#CBD5E1' }}
+                style={{ backgroundColor: geoEnabled ? G : T.line }}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${geoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
@@ -666,7 +668,7 @@ export default function SettingsPage() {
                 }}
                 disabled={busy}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-opacity active:opacity-70 disabled:opacity-40"
-                style={{ backgroundColor: 'rgba(27,107,58,0.08)', color: G }}
+                style={{ backgroundColor: T.brandTint, color: G }}
               >
                 <MapPin className="w-4 h-4 inline-block mr-1 -mt-0.5" aria-hidden="true" />Use my current location
               </button>

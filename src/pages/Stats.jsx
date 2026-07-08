@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Zap, Clock, TrendingUp, Users, BarChart2, Award } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
-const G     = '#1B6B3A'
-const MUTED = '#64748B'
-const INK   = '#0F172A'
-const LINE  = '#E2E8F0'
-const AMBER = '#F59B0A'
-const RED   = '#C0392B'
+import { T } from '../lib/tokens.js'
+
+const G     = T.brand
+const MUTED = T.textSecondary
+const INK   = T.textPrimary
+const LINE  = T.line
+const AMBER = T.waiting
+const RED   = T.danger
 
 /* ── Format minutes into "2h 15m" or "45 min" ── */
 function fmtMins(mins) {
@@ -20,11 +22,11 @@ function fmtMins(mins) {
 
 /* ── Health config ── */
 function healthConfig(servedPerHour, started) {
-  if (!started)           return { label: 'Not started', dot: '#94A3B8', bg: '#F8FAFC',      text: MUTED   }
-  if (servedPerHour >= 30) return { label: 'Great pace',  dot: G,         bg: 'rgba(27,107,58,0.07)',  text: G     }
-  if (servedPerHour >= 15) return { label: 'Good pace',   dot: '#22C55E', bg: 'rgba(34,197,94,0.08)',  text: '#15803D' }
-  if (servedPerHour >= 5)  return { label: 'Slow pace',   dot: AMBER,     bg: 'rgba(245,155,10,0.08)', text: '#92640A' }
-  return                          { label: 'Very slow',   dot: RED,       bg: 'rgba(192,57,43,0.07)',  text: RED   }
+  if (!started)           return { label: 'Not started', dot: T.textSecondary, bg: T.surface,      text: MUTED   }
+  if (servedPerHour >= 30) return { label: 'Great pace',  dot: G,         bg: T.brandTint,  text: G     }
+  if (servedPerHour >= 15) return { label: 'Good pace',   dot: T.served, bg: T.servedTint,  text: T.served }
+  if (servedPerHour >= 5)  return { label: 'Slow pace',   dot: AMBER,     bg: T.waitingTint, text: T.waiting }
+  return                          { label: 'Very slow',   dot: RED,       bg: T.dangerTint,  text: RED   }
 }
 
 export default function StatsPage() {
@@ -114,7 +116,7 @@ export default function StatsPage() {
         <div className="text-center py-16 text-sm" style={{ color: MUTED }}>Loading stats…</div>
       ) : total === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center" style={{ border: `1px solid ${LINE}` }}>
-          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "rgba(100,116,139,0.10)" }} aria-hidden="true"><BarChart2 className="w-7 h-7" style={{ color: "#64748B" }} /></div>
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: T.sunken }} aria-hidden="true"><BarChart2 className="w-7 h-7" style={{ color: T.textSecondary }} /></div>
           <p className="font-semibold text-base" style={{ color: INK }}>No registrations yet</p>
           <p className="text-sm mt-1.5" style={{ color: MUTED }}>
             Stats will appear once corps members start checking in.
@@ -126,10 +128,10 @@ export default function StatsPage() {
           {/* ══ TOP: 4-column metric strip ══ */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { icon: Users,     label: 'Registered', value: total,         sub: 'total today',        color: INK,   bg: 'rgba(15,23,42,0.05)'       },
-              { icon: Clock,     label: 'Waiting',    value: waiting,       sub: 'yet to be served',   color: AMBER, bg: 'rgba(245,155,10,0.07)'      },
-              { icon: TrendingUp,label: 'Served',     value: served,        sub: 'cleared so far',     color: G,     bg: 'rgba(27,107,58,0.07)'       },
-              { icon: Zap,       label: 'Pace',       value: served > 0 ? `${servedPerHour}/hr` : '—', sub: health.label, color: health.text, bg: health.bg },
+              { icon: Users,     label: 'Registered', value: total,         sub: 'total today',        color: INK,   bg: T.sunken       },
+              { icon: Clock,     label: 'Waiting',    value: waiting,       sub: 'yet to be served',   color: AMBER, bg: T.waitingTint      },
+              { icon: TrendingUp,label: 'Served',     value: served,        sub: 'cleared so far',     color: G,     bg: T.brandTint       },
+              { icon: Zap,       label: 'Pace',       value: served > 0 ? `${servedPerHour}/hr` : '0/hr', sub: health.label, color: health.text, bg: health.bg },
             ].map(({ icon: Icon, label, value, sub, color, bg }) => (
               <div key={label} className="bg-white rounded-2xl p-4" style={{ border: `1px solid ${LINE}` }}>
                 <div className="flex items-center justify-between mb-2">
@@ -198,13 +200,13 @@ export default function StatsPage() {
                       const isDone = wServed === wTotal && wTotal > 0
                       const isNow  = wave === currentBatch
                       const wPct   = wTotal > 0 ? (wServed / wTotal) * 100 : 0
-                      const barColor = isDone ? AMBER : isNow ? G : '#CBD5E1'
+                      const barColor = isDone ? AMBER : isNow ? G : T.line
                       const labelColor = isDone ? AMBER : isNow ? G : MUTED
 
                       return (
                         <div key={wave} className="flex-shrink-0" style={{ width: '46px' }}>
                           {/* Progress bar block */}
-                          <div className="relative h-12 rounded-xl overflow-hidden" style={{ backgroundColor: '#F1F5F9' }}>
+                          <div className="relative h-12 rounded-xl overflow-hidden" style={{ backgroundColor: T.sunken }}>
                             <div
                               className="absolute left-0 bottom-0 right-0 rounded-b-xl transition-all duration-700"
                               style={{ height: `${wPct}%`, backgroundColor: barColor, opacity: 0.3 }}
@@ -247,7 +249,7 @@ export default function StatsPage() {
                   <div className="py-4 text-center">
                     <Clock className="w-8 h-8 mx-auto mb-2" style={{ color: LINE }} />
                     <p className="text-sm font-semibold" style={{ color: MUTED }}>Session hasn't started yet</p>
-                    <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>Velocity appears once members are being served</p>
+                    <p className="text-xs mt-1" style={{ color: T.textSecondary }}>Velocity appears once members are being served</p>
                   </div>
                 ) : (
                   <>
@@ -259,7 +261,7 @@ export default function StatsPage() {
 
                     <div className="grid grid-cols-2 gap-3">
                       {/* Served per hour */}
-                      <div className="rounded-xl p-3.5" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
+                      <div className="rounded-xl p-3.5" style={{ backgroundColor: T.surface, border: `1px solid ${LINE}` }}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <Zap className="w-3.5 h-3.5" style={{ color: G }} />
                           <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>Rate</p>
@@ -269,13 +271,13 @@ export default function StatsPage() {
                       </div>
 
                       {/* Est. time remaining */}
-                      <div className="rounded-xl p-3.5" style={{ backgroundColor: '#F8FAFC', border: `1px solid ${LINE}` }}>
+                      <div className="rounded-xl p-3.5" style={{ backgroundColor: T.surface, border: `1px solid ${LINE}` }}>
                         <div className="flex items-center gap-1.5 mb-1">
                           <Clock className="w-3.5 h-3.5" style={{ color: AMBER }} />
                           <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>Est. left</p>
                         </div>
                         <p className="text-xl font-extrabold leading-tight" style={{ color: AMBER }}>
-                          {minRemaining !== null ? fmtMins(minRemaining) : '—'}
+                          {minRemaining !== null ? fmtMins(minRemaining) : 'Pending'}
                         </p>
                         <p className="text-xs mt-0.5 font-medium" style={{ color: MUTED }}>to clear queue</p>
                       </div>
@@ -283,7 +285,7 @@ export default function StatsPage() {
 
                     {/* Mini progress sentence */}
                     <p className="text-xs font-medium leading-relaxed rounded-xl px-3 py-2.5"
-                      style={{ backgroundColor: '#F8FAFC', color: MUTED, border: `1px solid ${LINE}` }}>
+                      style={{ backgroundColor: T.surface, color: MUTED, border: `1px solid ${LINE}` }}>
                       At this pace, {waiting} waiting member{waiting !== 1 ? 's' : ''} will be cleared
                       in approximately <span className="font-bold" style={{ color: INK }}>
                         {minRemaining !== null ? fmtMins(minRemaining) : 'an unknown time'}
@@ -315,13 +317,13 @@ export default function StatsPage() {
                               </span>
                               {isNow && (
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                  style={{ backgroundColor: 'rgba(27,107,58,0.1)', color: G }}>
+                                  style={{ backgroundColor: T.brandTint, color: G }}>
                                   Now Serving
                                 </span>
                               )}
                               {isDone && !isNow && (
                                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                  style={{ backgroundColor: 'rgba(245,155,10,0.1)', color: AMBER }}>
+                                  style={{ backgroundColor: T.waitingTint, color: AMBER }}>
                                   Done ✓
                                 </span>
                               )}
@@ -336,7 +338,7 @@ export default function StatsPage() {
                           <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: LINE }}>
                             <div
                               className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${wPct}%`, backgroundColor: isDone ? AMBER : isNow ? G : '#94A3B8' }}
+                              style={{ width: `${wPct}%`, backgroundColor: isDone ? AMBER : isNow ? G : T.textSecondary }}
                             />
                           </div>
                         </div>
